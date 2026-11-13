@@ -90,8 +90,8 @@ function armParam(x, y, z) { // s ao longo do antebraço (0 cotovelo, 1 punho) e
 }
 
 export async function buildWorker(stage, app) {
-  // ?avatar=tripo|rocketbox (padrão: tripo — modelo gerado da foto; Rocketbox continua como alternativa/reserva)
-  if ((new URLSearchParams(location.search).get('avatar') || 'tripo') === 'tripo') {
+  // ?avatar=tripo|rocketbox (padrão: rocketbox — escolhido pelo usuário; ?avatar=tripo usa o modelo gerado no Tripo)
+  if ((new URLSearchParams(location.search).get('avatar') || 'rocketbox') === 'tripo') {
     try { return await (await import('./worker_tripo.js')).buildWorkerTripo(stage, app); }
     catch (e) { console.warn('[worker] avatar Tripo indisponível, usando Rocketbox:', e); }
   }

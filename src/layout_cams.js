@@ -9,7 +9,8 @@ export const CAMS = {
   overview: { pos: [8.2, 5.6, 5.8], target: [-3.5, 1.0, -7.5], fov: 52, dof: 0 },
   station: { pos: [2.1, 1.65, 2.6], target: [-0.1, 1.15, -0.2], fov: 40, focus: [0.1, 1.3, 0.0], dof: 0.15 },
   // close-up do ombro ESQUERDO (lado da prensa = lado mais exposto) para mostrar o dosímetro instalado
-  shoulder: { pos: [0.55, 1.62, -0.75], target: [-0.02, 1.4, -0.16], fov: 32, focus: [-0.02, 1.42, -0.16], dof: 0.5 },
+  // (enquadra aparelho + orelha/capacete; foco entre microfone e orelha, fundo desfocado)
+  shoulder: { pos: [0.48, 1.5, -0.8], target: [0.02, 1.39, -0.1], fov: 32, focus: [0.04, 1.4, -0.11], dof: 0.5 },
 };
 // Bancada/carrinho do técnico com a maleta do kit (dosímetro + calibrador). Tampo a TABLE.h do piso.
 export const TABLE = { pos: [2.35, 0, 1.75], rotY: -0.5, h: 0.9 };

@@ -130,17 +130,48 @@ export async function buildWorkerTripo(stage, app) {
   function button() { const pb = app?.machines?.panelButton; if (pb?.isObject3D) return pb.getWorldPosition(V3()); if (pb?.isVector3) return pb.clone(); return BTN_DEFAULT.clone(); }
   const headFwdLocal = D2W(V3(1, 0, 0)).applyQuaternion(headBone.getWorldQuaternion(new THREE.Quaternion()).invert());
   const UP = V3(0, 1, 0);
+  const FR = V3(0.5, 0.85, -0.12).normalize(); // dedos da mão direita ao tocar (para cima/frente)
+
+  // braço do GLB é curto (úmero 0,205 m, antebraço 0,177 m; anatômico p/ 1,65 m ≈ 0,29/0,235): alonga os ossos
+  // transladando cotovelo/punho e os twist bones intermediários (estica a pele de modo uniforme, sem cisalhamento)
+  const EXT = { U: 1.24, F: 1.18 };
+  const lenRest = [];
+  for (const sd of ['L', 'R']) for (const [n, k] of [['_Forearm', EXT.U], ['_UpperarmTwist02', EXT.U], ['_Hand', EXT.F], ['_ForearmTwist02', EXT.F]]) {
+    const b = B(sd + n); if (b) lenRest.push([b, b.position.clone(), k]);
+  }
+  // alvo do toque: tecla do teclado de membrana uma fileira abaixo do panelButton (mesma face do console)
+  function touchPoint() {
+    const pb = app?.machines?.panelButton;
+    if (pb?.isObject3D && pb.parent) { pb.parent.updateWorldMatrix(true, false); return pb.parent.localToWorld(pb.position.clone().add(V3(0, -0.026, 0))); }
+    return button();
+  }
+  function screenPoint() { // centro da tela do console (para onde ela olha)
+    const pb = app?.machines?.panelButton;
+    if (pb?.isObject3D && pb.parent) return pb.parent.localToWorld(V3(-0.1, 0.185, 0.058));
+    return button();
+  }
 
   let activity = 'operando', dirty = true, lastBtn = V3(1e9, 0, 0), lastCam = V3(1e9, 0, 0);
   function pose() {
     if (!action) for (const [b, q] of rest) b.quaternion.copy(q);
+    for (const [b, p, k] of lenRest) b.position.copy(p).multiplyScalar(k);
     group.position.set(0, 0, 0); group.updateMatrixWorld(true);
     const op = activity === 'operando';
     const fwd = D2W(V3(1, 0, 0)), side = D2W(V3(0, 0, 1)); // frente e direita dela
-    // tronco: ~15° para a câmera (+z), repartido entre cintura e coluna; leve inclinação para o painel ao operar
+    // tronco ereto: ~15° para a câmera (+z), repartido entre cintura e coluna; ~5° para o painel ao operar
     const yaw = op ? -0.27 : -0.1;
     rotW(B('Waist'), UP, yaw * 0.25); rotW(B('Spine01'), UP, yaw * 0.35); rotW(B('Spine02'), UP, yaw * 0.4);
-    if (op) { rotW(B('Waist'), side, -0.05); rotW(B('Spine01'), side, -0.04); rotW(B('Spine02'), side, -0.03); } // ~7° para o painel
+    if (op) { rotW(B('Waist'), side, -0.035); rotW(B('Spine01'), side, -0.03); rotW(B('Spine02'), side, -0.025); }
+    // folga ao gabinete do painel: ela não avança além de XMAX (frente do corpo ~0,15 m da base); se o braço não alcança
+    // com o úmero a ~14°, o tronco inclina um pouco mais para o painel (pés plantados, giro só da cintura para cima)
+    const XMAX = -0.05, TH = THREE.MathUtils.degToRad(14);
+    const needX = () => { const btn = touchPoint(), wrist = btn.clone().addScaledVector(FR, -handLen.R * 0.97);
+      const sh = wpos(B('R_Upperarm')), ua = sh.distanceTo(wpos(B('R_Forearm'))), fa = wpos(B('R_Forearm')).distanceTo(wpos(B('R_Hand')));
+      const eY = sh.y + ua * Math.sin(TH), dyF = Math.min(fa * 0.97, Math.max(0, wrist.y - eY));
+      const Dh = ua * Math.cos(TH) + Math.sqrt(fa * fa - dyF * dyF), dz = wrist.z - sh.z;
+      return wrist.x - sh.x - Math.sqrt(Math.max(0.01, Dh * Dh - dz * dz)); };
+    if (op) { const ex = needX() - XMAX; if (ex > 0) { const ang = Math.min(0.16, Math.asin(Math.min(1, ex / 0.34)));
+      rotW(B('Waist'), side, -ang * 0.45); rotW(B('Spine01'), side, -ang * 0.35); rotW(B('Spine02'), side, -ang * 0.2); } }
 
     // braço esquerdo: baixo e relaxado junto ao corpo, palma para a coxa
     const fL = side.clone().negate();
@@ -150,28 +181,24 @@ export async function buildWorkerTripo(stage, app) {
 
     const look = V3();
     if (op) {
-      const btn = button();
-      if (B('R_Clavicle')) { rotW(B('R_Clavicle'), fwd, 0.17); rotW(B('R_Clavicle'), UP, 0.22); } // ombro sobe e avança ao erguer o braço
-      // dedos apontando para cima/frente até o ponto tocado; punho logo abaixo (antebraço em pé = braço em L)
-      const fR = V3(0.45, 0.88, -0.1).normalize();
-      const wrist = btn.clone().addScaledVector(fR, -handLen.R * 0.96);
-      // ela chega perto do painel (no máx. 15 cm, preserva as câmeras) até o cotovelo ficar ~120° (braço do GLB é curto)
-      const sh = wpos(B('R_Upperarm')), ua = sh.distanceTo(wpos(B('R_Forearm'))), fa = wpos(B('R_Forearm')).distanceTo(wpos(B('R_Hand')));
-      const dT = Math.sqrt(ua * ua + fa * fa + ua * fa), dy = wrist.y - sh.y, dz = wrist.z - sh.z;
-      const dxT = Math.sqrt(Math.max(0.01, dT * dT - dy * dy - dz * dz));
-      group.position.x = THREE.MathUtils.clamp(wrist.x - sh.x - dxT, 0, 0.15); group.updateMatrixWorld(true);
-      ik2('R', wrist, V3(-0.25, -1, 0.45).normalize());
-      orientHand('R', fR, V3(1, -0.42, 0.05).normalize());                         // palma voltada para o painel
-      look.copy(btn);
+      const btn = touchPoint();
+      if (B('R_Clavicle')) rotW(B('R_Clavicle'), UP, 0.16); // ombro avança um pouco ao estender o braço (sem encolher)
+      // dedo indicador para cima/frente até o ponto tocado; punho logo abaixo
+      const fR = FR, wrist = btn.clone().addScaledVector(fR, -handLen.R * 0.97);
+      // distância ao painel escolhida para o úmero sair ~14° acima da horizontal e o antebraço subir até a tela
+      group.position.x = THREE.MathUtils.clamp(needX(), -0.15, XMAX); group.updateMatrixWorld(true);
+      ik2('R', wrist, V3(-0.2, -1, 0.35).normalize());
+      orientHand('R', fR, V3(1, -0.5, 0.05).normalize());                         // palma voltada para o painel
+      look.copy(screenPoint()).lerp(btn, 0.35);
     } else {
       const s = wpos(B('R_Upperarm'));
       ik2('R', s.clone().addScaledVector(UP, -0.36).addScaledVector(fwd, 0.06).addScaledVector(side, 0.035), fwd.clone().negate().addScaledVector(side, 0.4));
       orientHand('R', UP.clone().negate().addScaledVector(fwd, 0.15), side.clone().negate());
       if (activity === 'olhando' && stage.camera) look.copy(stage.camera.position); else look.copy(wpos(headBone)).addScaledVector(fwd, 2);
     }
-    // cabeça: pescoço 25 % + 25 %, cabeça o resto; pitch limitado a 15°
+    // cabeça: pescoço 25 % + 33 %, cabeça o resto; pitch limitado a 12°
     const eye = wpos(headBone).addScaledVector(UP, 0.12), dv = look.clone().sub(eye), hz = Math.hypot(dv.x, dv.z);
-    const maxUp = hz * Math.tan(THREE.MathUtils.degToRad(15)); if (dv.y > maxUp) look.y = eye.y + maxUp;
+    const maxUp = hz * Math.tan(THREE.MathUtils.degToRad(12)); if (dv.y > maxUp) look.y = eye.y + maxUp;
     if (dv.y < -hz * 0.6) look.y = eye.y - hz * 0.6;
     for (const [bn, k] of [['NeckTwist01', 0.25], ['NeckTwist02', 0.33], ['Head', 1]]) {
       const bone = B(bn); if (!bone) continue;
@@ -186,7 +213,7 @@ export async function buildWorkerTripo(stage, app) {
   stage.scene.add(group);
   function update(dt, t) {
     if (action) { mixer.update(dt); dirty = true; }
-    const btn = activity === 'operando' ? button() : null;
+    const btn = activity === 'operando' ? touchPoint() : null;
     if (btn && btn.distanceToSquared(lastBtn) > 1e-8) { lastBtn.copy(btn); dirty = true; }
     if (activity === 'olhando' && stage.camera && stage.camera.position.distanceToSquared(lastCam) > 1e-6) { lastCam.copy(stage.camera.position); dirty = true; }
     if (dirty) { pose(); dirty = false; }

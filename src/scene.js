@@ -68,12 +68,18 @@ export async function createStage(canvas, { quality = 'high', app } = {}) {
 
   // ── tamanho + resolução dinâmica ──
   const basePR = Math.min(devicePixelRatio || 1, quality === 'low' ? 1 : 1.5);
-  let dyn = 1, lastDynT = 0;
+  // Resolução dinâmica SEM piscar: (1) o redimensionamento é adiado para o início do próximo quadro, antes de desenhar
+  // (redimensionar depois do render limpava o canvas e o navegador mostrava um quadro vazio); (2) histerese: só baixa após
+  // 3 medições seguidas abaixo de 40 fps e só sobe após 8 s seguidos acima de 58 fps; nada nos primeiros 8 s (carga/shaders).
+  let dyn = 1, lastDynT = 0, pendingResize = false, lowN = 0, highN = 0;
   const dynOn = qs.get('dynres') !== '0';
-  function resize() {
+  let stage_fitFov = null;
+  const baseFovRef = () => { try { return baseFov; } catch { return null; } };
+  const tweenRef = () => { try { return tween; } catch { return null; } };
+  function resize() { window.__resizes = (window.__resizes || 0) + 1;
     const w = canvas.clientWidth || innerWidth, h = canvas.clientHeight || innerHeight; const pr = basePR * dyn;
     renderer.setPixelRatio(pr); renderer.setSize(w, h, false);
-    camera.aspect = w / h; camera.updateProjectionMatrix();
+    camera.aspect = w / h; if (stage_fitFov && baseFovRef() != null && !tweenRef()) camera.fov = stage_fitFov(baseFovRef()); camera.updateProjectionMatrix();
     post?.setSize(w, h, pr);
   }
   addEventListener('resize', resize); resize();
@@ -88,10 +94,19 @@ export async function createStage(canvas, { quality = 'high', app } = {}) {
     const a = (ang * Math.PI) / 180;
     return { pos: [tx + r * Math.sin(a), h, tz + r * Math.cos(a)], target: [tx, ty, tz], fov };
   }
+  // As vistas foram enquadradas para tela 3:2. Em tela mais estreita (celular em pé), abre o campo vertical para manter
+  // ~85% da largura do enquadramento original (limite 64°), em vez de cortar a cena dos lados.
+  let baseFov = null;
+  function fitFov(f) {
+    const asp = camera.aspect || 1.5; if (asp >= 1.45) return f;
+    const hf = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(f) / 2) * 1.5 * 0.85);
+    return Math.min(64, Math.max(f, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(hf / 2) / asp))));
+  }
+  stage_fitFov = fitFov;
   function flyTo(v, duration = 1.6) {
     const pos = new THREE.Vector3(...(v.pos.isVector3 ? v.pos.toArray() : v.pos));
     const target = new THREE.Vector3(...(v.target.isVector3 ? v.target.toArray() : v.target));
-    const fov = v.fov ?? camera.fov;
+    baseFov = v.fov ?? baseFov ?? camera.fov; const fov = fitFov(baseFov);
     if (tween) { tween.resolve(); tween = null; }
     if (!duration || duration <= 0.01) {
       camera.position.copy(pos); controls.target.copy(target); camera.fov = fov; camera.updateProjectionMatrix(); controls.update();
@@ -137,6 +152,7 @@ export async function createStage(canvas, { quality = 'high', app } = {}) {
   const clock = new THREE.Clock(); let fc = 0, ft = 0, tAll = 0;
   renderer.setAnimationLoop(() => {
     const dt = Math.min(0.1, clock.getDelta()); tAll += dt;
+    if (pendingResize) { pendingResize = false; resize(); }
     for (const f of [...fns]) { try { f(dt, tAll); } catch (e) { console.error('[scene] onFrame:', e); fns.delete(f); } }
     if (tween) {
       tween.t = Math.min(1, tween.t + dt / tween.d); const e = ease(tween.t);
@@ -152,9 +168,10 @@ export async function createStage(canvas, { quality = 'high', app } = {}) {
     fc++; ft += dt;
     if (ft > 0.5) {
       window.__fps = Math.round(fc / ft); fc = 0; ft = 0;
-      if (dynOn && tAll - lastDynT > 2 && tAll > 4) {
-        if (window.__fps < 44 && dyn > 0.6) { dyn = Math.max(0.6, dyn - 0.1); resize(); lastDynT = tAll; }
-        else if (window.__fps > 57 && dyn < 1) { dyn = Math.min(1, dyn + 0.05); resize(); lastDynT = tAll; }
+      if (dynOn && tAll > 8 && !document.hidden) {
+        lowN = window.__fps < 40 ? lowN + 1 : 0; highN = window.__fps > 58 ? highN + 1 : 0;
+        if (lowN >= 3 && dyn > 0.6 && tAll - lastDynT > 3) { dyn = Math.max(0.6, dyn - 0.1); pendingResize = true; lastDynT = tAll; lowN = 0; }
+        else if (highN >= 16 && dyn < 1 && tAll - lastDynT > 8) { dyn = Math.min(1, dyn + 0.1); pendingResize = true; lastDynT = tAll; highN = 0; }
       }
     }
   });

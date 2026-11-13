@@ -14,7 +14,12 @@ export function createUI(root, app) {
   const live = h('div', 'ui-live glass', '');
   root.append(top, live);
   // ── visor ampliado ──
-  const lcdWrap = h('div', 'ui-lcd glass hidden', '<div class="ui-cap">Visor do dosímetro</div>');
+  const lcdWrap = h('div', 'ui-lcd glass hidden', '<div class="ui-cap ui-cap-toggle">Visor do dosímetro <span class="chev">▾</span></div>');
+  // no celular o painel começa recolhido (não cobre a cena); toque no título abre/fecha
+  let lcdUser = false;
+  const narrow = () => innerWidth < 760;
+  if (narrow()) lcdWrap.classList.add('collapsed');
+  lcdWrap.querySelector('.ui-cap-toggle').onclick = () => { lcdUser = true; lcdWrap.classList.toggle('collapsed'); };
   const lcd = h('canvas'); lcd.width = 256; lcd.height = 320; lcdWrap.appendChild(lcd);
   const keys = h('div', 'ui-keys');
   // Teclas do aparelho: toque curto ao soltar; pressão longa dispara sozinha aos 3 s com o dedo ainda no botão (como no DoseMax).
@@ -78,7 +83,7 @@ export function createUI(root, app) {
   let stepIdx = 0, running = false, cancelled = false;
   function render() {
     const p = S.phase;
-    lcdWrap.classList.remove('hidden');
+    lcdWrap.classList.remove('hidden'); if (narrow() && !lcdUser) lcdWrap.classList.toggle('collapsed', !['apresentacao'].includes(p));
     dash.classList.toggle('hidden', !['dosimetria', 'relatorio'].includes(p));
     if (p === 'explorar') {
       cap.classList.add('hidden');
