@@ -1,0 +1,1 @@
+Female_Adult_11 — Microsoft Rocketbox (https://github.com/microsoft/Microsoft-Rocketbox), MIT. Texturas TGA convertidas para JPG/PNG.

@@ -1,0 +1,14 @@
+# material interno / de terceiros que não vai para o site
+shots/
+refs/
+docs/
+tools/
+BRIEF.md
+INSPECT_BRIEF.md
+assets/Michelle.glb
+assets/rocketbox_thumbs/
+src/*lookdev*.html
+src/worker_fbx_probe.html
+.DS_Store
+src/*_probe.html
+assets/operadora/*.md
