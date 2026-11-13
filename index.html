@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Dosimetria de Ruído — Gêmeo Digital</title>
-<link rel="stylesheet" href="src/ui.css">
+<link rel="stylesheet" href="src/ui.css?v=49fd4eb0">
 <style>
   :root { --bg:#0b0d10; --fg:#e8eaed; }
   html, body { margin:0; height:100%; overflow:hidden; background:var(--bg); color:var(--fg); font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -14,16 +14,51 @@
   #boot { position:fixed; inset:0; display:grid; place-items:center; font:600 13px system-ui; letter-spacing:.14em; color:#8a9099; pointer-events:none; transition:opacity .6s; }
 </style>
 <script type="importmap">
-{ "imports": {
+{
+ "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
-} }
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
+  "./src/acoustics.js": "./src/acoustics.js?v=1dd99451",
+  "./src/audio.js": "./src/audio.js?v=4e7d912f",
+  "./src/calibrator.js": "./src/calibrator.js?v=4bb7c020",
+  "./src/crew.js": "./src/crew.js?v=536b512a",
+  "./src/demo.js": "./src/demo.js?v=6472eaf7",
+  "./src/dosi_geo.js": "./src/dosi_geo.js?v=9a9d27ab",
+  "./src/dosi_kit.js": "./src/dosi_kit.js?v=331030cb",
+  "./src/dosi_tex.js": "./src/dosi_tex.js?v=9ee82d0a",
+  "./src/dosimeter.js": "./src/dosimeter.js?v=3c1607a9",
+  "./src/dosimetry.js": "./src/dosimetry.js?v=9284c8cb",
+  "./src/firmware.js": "./src/firmware.js?v=1af21f72",
+  "./src/fw_core.js": "./src/fw_core.js?v=5e440470",
+  "./src/hall.js": "./src/hall.js?v=89f0edc2",
+  "./src/layout_cams.js": "./src/layout_cams.js?v=19cda87f",
+  "./src/layout_machines.js": "./src/layout_machines.js?v=7d737c7b",
+  "./src/lcd.js": "./src/lcd.js?v=22572452",
+  "./src/mach_tex.js": "./src/mach_tex.js?v=4fd4bed2",
+  "./src/machines.js": "./src/machines.js?v=6181a95a",
+  "./src/main.js": "./src/main.js?v=911f0bb3",
+  "./src/props.js": "./src/props.js?v=8846987e",
+  "./src/props_tex.js": "./src/props_tex.js?v=73130807",
+  "./src/scene.js": "./src/scene.js?v=b8f5b688",
+  "./src/scene_post.js": "./src/scene_post.js?v=3384080e",
+  "./src/ui.js": "./src/ui.js?v=98b1308e",
+  "./src/workday.js": "./src/workday.js?v=ff172fb8",
+  "./src/worker.js": "./src/worker.js?v=75d309a1",
+  "./src/worker_head.js": "./src/worker_head.js?v=67d3a71b",
+  "./src/worker_head_hair.js": "./src/worker_head_hair.js?v=c1f4290e",
+  "./src/worker_head_tex.js": "./src/worker_head_tex.js?v=acc85752",
+  "./src/worker_shirt.js": "./src/worker_shirt.js?v=4ea0280e",
+  "./src/worker_tripo.js": "./src/worker_tripo.js?v=0cff81ff",
+  "./src/worker_tripo_mat.js": "./src/worker_tripo_mat.js?v=9408849e",
+  "./src/worker_tripo_mat_atlas.js": "./src/worker_tripo_mat_atlas.js?v=f1005840"
+ }
+}
 </script>
 </head>
 <body>
 <canvas id="c" tabindex="0"></canvas>
 <div id="ui"></div>
 <div id="boot">CARREGANDO GÊMEO DIGITAL…</div>
-<script type="module" src="src/main.js"></script>
+<script type="module">import './src/main.js';</script>
 </body>
 </html>
