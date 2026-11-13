@@ -388,55 +388,100 @@ export async function buildWorker(stage, app) {
   const lidRest = ['LEyeBlinkTop', 'REyeBlinkTop'].map((n) => B[n]).filter(Boolean);
 
   function button() { const pb = app?.machines?.panelButton; if (pb?.isObject3D) return pb.getWorldPosition(V3()); if (pb?.isVector3) return pb.clone(); return BTN_DEFAULT.clone(); }
-  let activity = 'operando', t0 = 0, press = 0, nextPress = 1.5, blinkT = 2.5, blink = 0;
+  // ── MOVIMENTO: ciclo de trabalho procedural (sem clips de animação), tudo misturado suavemente ──
+  // fases: 'digitar' (mão vai de tecla em tecla e aperta), 'tela' (confere a tela), 'prensa' (baixa o braço, vira o tronco
+  // e a cabeça para a prensa), 'apoio' (braços baixos, troca o apoio das pernas). Atividades: operando | parada | olhando.
+  let activity = 'operando', t0 = 0, blinkT = 2.5, blink = 0;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const KEYS = [[0, 0], [0.032, 0], [-0.03, -0.034], [0, -0.034], [0.032, -0.068], [-0.03, 0.03], [0.016, -0.1]];
+  let phase = 'digitar', phaseT = 0, phaseDur = rnd(5, 7), keyI = 0, keyT = 0, keyDur = 0.7, pressK = 0;
+  const S = { arm: 1, turn: 0, shift: 0, lookAt: V3(1.5, 1.6, 0.2), key: V3(), keyInit: false, idleLook: V3(1.5, 1.5, 0.3), idleT: 0 };
+  function nextPhase() {
+    const seq = { digitar: Math.random() < 0.6 ? 'tela' : 'prensa', tela: Math.random() < 0.5 ? 'digitar' : 'prensa', prensa: Math.random() < 0.5 ? 'apoio' : 'digitar', apoio: 'digitar' };
+    phase = seq[phase] || 'digitar'; phaseT = 0;
+    phaseDur = { digitar: rnd(4.5, 7.5), tela: rnd(1.8, 3.0), prensa: rnd(3.5, 5.0), apoio: rnd(2.5, 4.0) }[phase];
+  }
+  const sm = (cur, tgt, rate, dt) => cur + (tgt - cur) * (1 - Math.exp(-rate * dt));
+  const smV = (cur, tgt, rate, dt) => cur.lerp(tgt, 1 - Math.exp(-rate * dt));
+  const PRESS_POS = V3(-1.3, 1.05, -1.6);               // matriz da prensa atrás, à esquerda dela
   function update(dt, t) {
-    t0 += dt;
+    t0 += dt; dt = Math.min(dt, 0.1);
     for (const [b, qr] of rest) b.quaternion.copy(qr);
     for (const b of lidRest) b.position.copy(restPos.get(b));
     group.updateMatrixWorld(true);
-    const br = Math.sin(t0 * 2 * Math.PI / 4.3), op = activity === 'operando' ? 1 : 0;
-    const side = W(1, 0, 0), up = V3(0, 1, 0);
-    // tronco: leve inclinação para o painel e giro de ~17° para a câmera (+z), como na foto
-    rotW(B.Pelvis, up, -0.12 * op + 0.04 * Math.sin(t0 * 0.21));
-    rotW(B.Spine1, side, 0.03 + 0.07 * op + br * 0.008);
-    rotW(B.Spine1, up, -0.17 * op);
-    rotW(B.Spine2, side, 0.02 + 0.03 * op + br * 0.01);
-    rotW(B.Spine2, up, -0.2 * op + Math.sin(t0 * 0.37) * 0.01);
-    if (op && B.R_Clavicle) rotW(B.R_Clavicle, W(0, 0, 1), -0.12);           // ombro direito sobe um pouco ao erguer o braço
-    if (op) { // ela fica perto do painel: avança o corpo até o ombro ficar ~0,39 m atrás do botão (braço em L como na foto)
-      const bx = button().x, shx = wpos(B.R_UpperArm).x;
-      group.position.x = Math.max(0, Math.min(0.12, group.position.x + (bx - 0.40 - shx))); group.updateMatrixWorld(true); }
-    // braço esquerdo relaxado junto ao corpo, mão meio fechada
-    const sl = wpos(B.L_UpperArm);
-    aim(B.L_UpperArm, B.L_Forearm, sl.clone().add(W(0.12, -1, 0.04).normalize()));
-    aim(B.L_Forearm, B.L_Hand, wpos(B.L_Forearm).add(W(0.08, -1, 0.28).normalize()));
-    const look = V3();
-    if (op) {
-      press = Math.max(0, press - dt * 4); nextPress -= dt;
-      if (nextPress < 0) { press = 1; nextPress = 1.8 + Math.random() * 3; }
-      const btnP = button(), btn = btnP.clone(); btn.y = Math.min(btn.y, 1.68);   // alvo do dedo limitado (mão à altura dos olhos, como na foto)
-      // braço erguido: dedo sobe até a tela, punho acima dos olhos, cotovelo para baixo/fora
-      const fdir = V3(0.5, 0.85, -0.08).normalize();
-      const wrist = btn.clone().sub(fdir.clone().multiplyScalar(0.165 - 0.012 * Math.sin(press * Math.PI)));
-      wrist.y += Math.sin(t0 * 1.3) * 0.002;
-      ik('R', wrist, W(-0.55, -0.8, 0.15).normalize());
-      aim(B.R_Hand, B.R_Finger1, btn);
+    const op = activity === 'operando';
+    // diretor de fases
+    if (op) { phaseT += dt; if (phaseT > phaseDur) nextPhase(); } else phase = 'apoio';
+    const armT = op && (phase === 'digitar' || phase === 'tela') ? 1 : 0;
+    const turnT = op && phase === 'prensa' ? 1 : 0;
+    S.arm = sm(S.arm, armT, armT ? 2.6 : 2.0, dt);
+    S.turn = sm(S.turn, turnT, 1.8, dt);
+    const shiftT = Math.sin(t0 * 2 * Math.PI / 9.5) * (phase === 'apoio' ? 1 : 0.45);
+    S.shift = sm(S.shift, shiftT, 1.5, dt);
+    const br = Math.sin(t0 * 2 * Math.PI / 4.3);
+    const side = W(1, 0, 0), fwd = W(0, 0, 1), up = V3(0, 1, 0);
+    const armW = S.arm, turn = S.turn;
+    // tronco: giro para a câmera quando opera; para a prensa (esquerda, +yaw) quando confere a peça; troca de apoio (rolagem)
+    rotW(B.Pelvis, up, -0.12 * armW + 0.20 * turn + 0.03 * Math.sin(t0 * 0.21));
+    rotW(B.Pelvis, fwd, 0.035 * S.shift);
+    rotW(B.Spine1, side, 0.03 + 0.06 * armW + br * 0.012);
+    rotW(B.Spine1, up, -0.17 * armW + 0.15 * turn);
+    rotW(B.Spine1, fwd, -0.028 * S.shift);
+    rotW(B.Spine2, side, 0.02 + 0.03 * armW + br * 0.016);
+    rotW(B.Spine2, up, -0.2 * armW + 0.16 * turn + Math.sin(t0 * 0.37) * 0.012);
+    for (const [cal, sg] of [[B.L_Calf, 1], [B.R_Calf, -1]]) if (cal) rotW(cal, side, -0.07 * Math.max(0, sg * S.shift)); // joelho da perna sem apoio dobra
+    if (B.R_Clavicle) rotW(B.R_Clavicle, W(0, 0, 1), -0.12 * armW + br * 0.006);
+    if (B.L_Clavicle) rotW(B.L_Clavicle, W(0, 0, 1), br * 0.006);
+    // aproxima do painel só o necessário para alcançar a tecla
+    { const bx = button().x, shx = wpos(B.R_UpperArm).x;
+      group.position.x = Math.max(0, Math.min(0.12, group.position.x + ((bx - 0.40 - shx)) * armW * Math.min(1, dt * 3))); group.updateMatrixWorld(true); }
+    // braço esquerdo: relaxado; ao conferir a prensa, a mão sobe um pouco à frente (gesto de checar a peça)
+    { const sl = wpos(B.L_UpperArm);
+      aim(B.L_UpperArm, B.L_Forearm, sl.clone().add(W(0.12 + 0.1 * turn, -1, 0.04 + 0.25 * turn).normalize()));
+      aim(B.L_Forearm, B.L_Hand, wpos(B.L_Forearm).add(W(0.08, -1 + 0.75 * turn, 0.28 + 0.6 * turn).normalize())); }
+    // braço direito: mistura entre "baixo" e "na tecla atual" (IK)
+    const btnP = button(), btn = btnP.clone(); btn.y = Math.min(btn.y, 1.68);
+    const nOut = V3(0.4, 0, 0.18).sub(V3(btn.x, 0, btn.z)).normalize(); // da tecla para ela (normal aproximada da face do painel)
+    const kRight = V3(0, 1, 0).cross(nOut).normalize(), kUp = V3(0, 1, 0);
+    if (op && phase === 'digitar') {
+      keyT += dt;
+      if (keyT > keyDur) { keyT = 0; keyDur = rnd(0.45, 0.9); keyI = (keyI + 1 + Math.floor(Math.random() * 3)) % KEYS.length; }
+      pressK = keyT > keyDur * 0.55 ? Math.sin(Math.min(1, (keyT - keyDur * 0.55) / (keyDur * 0.4)) * Math.PI) : 0;
+    } else { pressK = sm(pressK, 0, 8, dt); }
+    const [kx, ky] = phase === 'tela' ? [0.0, 0.02] : KEYS[keyI];
+    const keyTarget = btn.clone().addScaledVector(kRight, kx).addScaledVector(kUp, ky).addScaledVector(nOut, -0.014 * pressK);
+    if (!S.keyInit) { S.key.copy(keyTarget); S.keyInit = true; }
+    smV(S.key, keyTarget, 9, dt);
+    const fdir = V3(0.5, 0.85, -0.08).normalize();
+    const wristUp = S.key.clone().sub(fdir.clone().multiplyScalar(0.165));
+    wristUp.y += Math.sin(t0 * 1.3) * 0.002;
+    const sr = wpos(B.R_UpperArm), wristDown = sr.clone().add(W(-0.06, -0.5, 0.1));
+    const wrist = wristDown.clone().lerp(wristUp, armW);
+    if (armW > 0.02) wrist.y += Math.sin(Math.PI * armW) * 0.05;            // arco natural ao subir/descer
+    ik('R', wrist, W(-0.55, -0.8, 0.15).lerp(W(-0.15, -0.2, -1), 1 - armW).normalize());
+    if (armW > 0.35) {
+      aim(B.R_Hand, B.R_Finger1, S.key, Math.min(1, (armW - 0.35) / 0.4));
       const palmN = wpos(B.R_Finger4).sub(wpos(B.R_Finger1)).cross(wpos(B.R_Finger2).sub(wpos(B.R_Hand))).normalize();
-      for (const f of ['2', '3', '4']) fingerCurl('R', f, 1.15, palmN);
-      look.copy(btn).add(V3(0.0, -0.04, -0.06));
-    } else {
-      const sr = wpos(B.R_UpperArm);
-      aim(B.R_UpperArm, B.R_Forearm, sr.clone().add(W(-0.12, -1, 0.04).normalize()));
-      aim(B.R_Forearm, B.R_Hand, wpos(B.R_Forearm).add(W(-0.08, -1, 0.28).normalize()));
-      if (activity === 'olhando' && stage.camera) look.copy(stage.camera.position); else look.copy(V3(1.5, 1.5, 0.3));
+      for (const f of ['2', '3', '4']) fingerCurl('R', f, 1.15 * Math.min(1, armW * 1.4), palmN);
     }
-    // cabeça olha o alvo (40 % pescoço, 100 % cabeça)
+    // olhar: tecla → tela → prensa; parada: passeia o olhar; olhando: câmera
+    const look = V3();
+    if (activity === 'olhando' && stage.camera) look.copy(stage.camera.position);
+    else if (op && phase === 'digitar') look.copy(S.key).add(V3(0, 0.03, 0));
+    else if (op && phase === 'tela') look.copy(btn).addScaledVector(kUp, 0.09).addScaledVector(kRight, -0.05);
+    else if (op && phase === 'prensa') look.copy(PRESS_POS);
+    else {
+      S.idleT -= dt; if (S.idleT < 0) { S.idleT = rnd(1.5, 3.5); const opts = [V3(1.5, 1.5, 0.3), PRESS_POS, V3(2.0, 1.4, 3.0), V3(-2, 1.5, -8), btn];
+        S.idleLook.copy(opts[Math.floor(Math.random() * opts.length)]); }
+      look.copy(S.idleLook);
+    }
+    smV(S.lookAt, look, 4, dt); look.copy(S.lookAt);
     { const hp0 = wpos(B.Head).add(V3(0, 0.09, 0)), dv = look.clone().sub(hp0), hz = Math.hypot(dv.x, dv.z), mx = hz * Math.tan(0.24);
       if (dv.y > mx) look.y = hp0.y + mx; }                                         // queixo quase nivelado: olhar sobe no máx. ~14°
-    for (const [bone, k] of [[B.Neck, 0.4], [B.Head, 1]]) {
+    for (const [bone, k] of [[B.Neck, 0.45], [B.Head, 1]]) {
       const hpw = wpos(B.Head).add(V3(0, 0.09, 0));
-      const fwd = headFwdLocal.clone().applyQuaternion(B.Head.getWorldQuaternion(tq)).normalize();
-      const d = new THREE.Quaternion().setFromUnitVectors(fwd, look.clone().sub(hpw).normalize()); d.slerp(new THREE.Quaternion(), 1 - k);
+      const fwdH = headFwdLocal.clone().applyQuaternion(B.Head.getWorldQuaternion(tq)).normalize();
+      const d = new THREE.Quaternion().setFromUnitVectors(fwdH, look.clone().sub(hpw).normalize()); d.slerp(new THREE.Quaternion(), 1 - k);
       bone.getWorldQuaternion(tq); setWQ(bone, tq.premultiply(d));
     }
     // piscar (desce as pálpebras superiores ~6 mm por 0,12 s)
@@ -448,6 +493,7 @@ export async function buildWorker(stage, app) {
   }
   update(0, 0);
 
-  return { group, anchors, update, setActivity(name) { activity = name; },
+  return { group, anchors, update, setActivity(name) { activity = name; }, get phase() { return phase; },
+    setPhase(p, hold = 99) { phase = p; phaseT = 0; phaseDur = hold; },
     debug: () => { const m = anchors.shoulderL.localToWorld(V3(0, 0.09, 0)), e = anchors.earL.getWorldPosition(V3()); return { mic: m.toArray(), ear: e.toArray(), d: m.distanceTo(e) }; } };
 }

@@ -1,6 +1,6 @@
 // Interface + demonstração narrada — dono: UI/DEMO.
 // Fluxo: explorar → Dosímetro (apresentação: operar + calibrar) → colocar na trabalhadora → iniciar dosimetria → parar + pós-cal → relatório.
-import { STEPS, MOUNT_TEXT, fwDo } from './demo.js';
+import { STEPS, CHAPTERS, MOUNT_TEXT, fwDo } from './demo.js';
 
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 const f1 = (v) => (isFinite(v) ? v.toFixed(1) : '—');
@@ -62,13 +62,13 @@ export function createUI(root, app) {
 
   // ── narração por voz (pt-BR) ──
   let voiceOn = true, voice = null;
-  const pickVoice = () => { const vs = speechSynthesis?.getVoices?.() || []; voice = vs.find((v) => /francisca/i.test(v.name)) || vs.find((v) => /luciana/i.test(v.name)) || vs.find((v) => /^pt(-|_)BR/i.test(v.lang)) || vs.find((v) => /^pt/i.test(v.lang)) || null; };
+  const pickVoice = () => { const vs = speechSynthesis?.getVoices?.() || []; voice = vs.find((v) => /francisca/i.test(v.name) && /natural|online/i.test(v.name)) || vs.find((v) => /francisca/i.test(v.name)) || vs.find((v) => /luciana/i.test(v.name)) || vs.find((v) => /^pt(-|_)BR/i.test(v.lang)) || vs.find((v) => /^pt/i.test(v.lang)) || null; };
   try { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; } catch {}
   function say(text) {
     return new Promise((res) => {
       try { speechSynthesis.cancel(); } catch {}
       if (!voiceOn || !window.speechSynthesis) return setTimeout(res, Math.min(9000, 1200 + text.length * 45));
-      const u = new SpeechSynthesisUtterance(text.replace(/<[^>]+>/g, '')); u.lang = 'pt-BR'; if (voice) u.voice = voice; u.rate = 1.05;
+      const u = new SpeechSynthesisUtterance(text.replace(/<[^>]+>/g, '')); u.lang = 'pt-BR'; if (voice) u.voice = voice; u.rate = voice && /francisca/i.test(voice.name) ? 1.0 : 1.05;
       let done = false; const fin = () => { if (!done) { done = true; res(); } };
       u.onend = fin; u.onerror = fin; setTimeout(fin, 2500 + text.length * 90); speechSynthesis.speak(u);
     });
@@ -87,14 +87,14 @@ export function createUI(root, app) {
     dash.classList.toggle('hidden', !['dosimetria', 'relatorio'].includes(p));
     if (p === 'explorar') {
       cap.classList.add('hidden');
-      setBar([soundBtn(), viewBtns(), btn('<span class="ic">◉</span> Dosímetro', 'primary big', startPresentation)]);
+      setBar([soundBtn(), viewBtns(), btn('🎓 Demonstração', 'big', openDemoChooser), btn('<span class="ic">◉</span> Dosímetro', 'primary big', () => startPresentation('tudo'))]);
     } else if (p === 'apresentacao') {
       setBar([soundBtn(), btn('◀ Anterior', '', () => goStep(stepIdx - 1)), btn(`Próximo ▶`, 'primary', () => goStep(stepIdx + 1)),
         btn(voiceOn ? '🗣 Voz' : '🔈 Voz off', 'ghost', () => { voiceOn = !voiceOn; if (!voiceOn) try { speechSynthesis.cancel(); } catch {} render(); }),
         btn('Pular demonstração ⏭', 'ghost', () => finishPresentation())]);
     } else if (p === 'pronto') {
-      showCaption('Demonstração concluída', 'O dosímetro está ligado, configurado e calibrado. Agora ele será instalado na trabalhadora: sobre o ombro, preso na vestimenta, com o microfone dentro da zona auditiva.', `${STEPS.length}/${STEPS.length}`);
-      setBar([soundBtn(), btn('↺ Rever demonstração', 'ghost', startPresentation), btn('<span class="ic">⤴</span> Colocar o dosímetro na trabalhadora', 'primary big', mount)]);
+      showCaption('Demonstração concluída', 'O dosímetro está ligado, configurado e calibrado. Agora ele será instalado na trabalhadora: sobre o ombro, preso na vestimenta, com o microfone dentro da zona auditiva.', `${steps.length}/${steps.length}`);
+      setBar([soundBtn(), btn('🎓 Demonstração', 'ghost', openDemoChooser), btn('<span class="ic">⤴</span> Colocar o dosímetro na trabalhadora', 'primary big', mount)]);
     } else if (p === 'colocado') {
       setBar([soundBtn(), viewBtns(), btn('↩ Retirar', 'ghost', async () => { await app.unmountDosimeter(); app.setPhase('pronto'); }), btn('<span class="ic">▶</span> Iniciar dosimetria', 'primary big', start)]);
     } else if (p === 'dosimetria') {
@@ -102,7 +102,7 @@ export function createUI(root, app) {
       const sp = h('div', 'ui-seg'); for (const s of [60, 240, 960]) { const b = btn(s + '×', 'seg' + (S.speed === s ? ' on' : ''), () => { app.setSpeed(s); render(); }); sp.appendChild(b); }
       setBar([soundBtn(), viewBtns(), h('span', 'ui-lbl', 'Velocidade'), sp, btn(S.running ? '❙❙ Pausar simulação' : '▶ Continuar', 'ghost', () => { S.running ? app.pauseDosimetry() : (S.running = true); render(); }), btn('■ Encerrar e pós-calibrar', 'danger', stopAndReport)]);
     } else if (p === 'relatorio') {
-      setBar([soundBtn(), btn('📄 Ver relatório', 'primary', showReport), btn('↺ Nova avaliação', 'ghost', () => location.reload())]);
+      setBar([soundBtn(), btn('🎓 Demonstração', 'ghost', openDemoChooser), btn('📄 Ver relatório', 'primary', showReport), btn('↺ Nova avaliação', 'ghost', () => location.reload())]);
     }
   }
   function showCaption(title, text, count) {
@@ -110,16 +110,33 @@ export function createUI(root, app) {
     cap.innerHTML = `<div class="ui-cap-h"><span>${count || ''}</span><b>${title}</b></div><div class="ui-cap-t">${text}</div>`;
   }
 
-  async function startPresentation() {
-    app.audio?.start?.();
-    app.setPhase('apresentacao'); stepIdx = -1; await goStep(0);
+  let steps = STEPS, chapterId = 'tudo';
+  async function startPresentation(ch = 'tudo') {
+    app.audio?.start?.(); modal.classList.add('hidden');
+    chapterId = typeof ch === 'string' ? ch : 'tudo';
+    steps = chapterId === 'tudo' ? STEPS : STEPS.filter((x) => x.chapter === chapterId);
+    app.setPhase('apresentacao'); stepIdx = -1;
+    if (chapterId !== 'tudo' && chapterId !== 'uso') { // capítulo avulso: aparelho já na mão, de frente
+      app.setView('present', { animate: true, duration: 1.6 }); await app.present(app.dosimeter?.group, 'presentDevice', 1.2); await fwDo.powerOn(app); }
+    await goStep(0);
+  }
+  function voiceName() { return voice ? voice.name.replace(/^Microsoft\s+/i, '').replace(/\s*-.*$/, '') : 'voz do sistema'; }
+  function openDemoChooser() {
+    const fr = voice && /francisca/i.test(voice.name);
+    modal.innerHTML = `<div class="ui-report glass ui-chooser"><button class="ui-x">✕</button><h2>Demonstração do dosímetro</h2>
+      <p class="sub">Aprenda a usar, configurar e calibrar o aparelho, com o visor e as teclas reais e explicação por áudio.</p>
+      <div class="ui-chapters">${CHAPTERS.map((c) => `<button class="ui-chap" data-ch="${c.id}"><b>${c.label}</b><span>${c.sub}</span><em>${(c.id === 'tudo' ? STEPS : STEPS.filter((x) => x.chapter === c.id)).length} passos</em></button>`).join('')}</div>
+      <p class="voice ${fr ? 'ok' : ''}">🗣 Narração: <b>${voiceName()}</b>${fr ? '' : ' — a voz <b>Francisca</b> (Microsoft, natural) aparece ao abrir o simulador no navegador <b>Microsoft Edge</b>.'}</p></div>`;
+    modal.classList.remove('hidden');
+    modal.querySelector('.ui-x').onclick = () => modal.classList.add('hidden');
+    modal.querySelectorAll('.ui-chap').forEach((b) => (b.onclick = () => startPresentation(b.dataset.ch)));
   }
   let token = 0;
   async function goStep(i) {
     if (i < 0) i = 0;
-    if (i >= STEPS.length) return finishPresentation();
-    const my = ++token; stepIdx = i; const st = STEPS[i]; render();
-    showCaption(st.title, st.text, `${i + 1}/${STEPS.length}`);
+    if (i >= steps.length) return finishPresentation();
+    const my = ++token; stepIdx = i; const st = steps[i]; render();
+    showCaption(st.title, st.text, `${i + 1}/${steps.length}`);
     app.dosimeter?.highlight?.(st.highlight || null);
     const speech = say(st.say || st.text);
     try { await st.run?.(app, { wait: (ms) => new Promise((r) => setTimeout(r, ms)), alive: () => my === token }); } catch (e) { console.error('[demo]', e); }
@@ -136,7 +153,9 @@ export function createUI(root, app) {
     showCaption('Instalação no trabalhador (NHO-01, item 6.3)', MOUNT_TEXT, '');
     say(MOUNT_TEXT.replace(/<li>/g, '. '));
     app.setView('shoulder', { animate: true, duration: 2 });
+    app.worker?.setActivity?.('olhando');                 // fica parada olhando o avaliador enquanto o aparelho é preso
     await app.mountDosimeter({ side: 'L', duration: 1.8 });
+    setTimeout(() => app.worker?.setActivity?.('operando'), 2500);
     app.setPhase('colocado');
   }
   async function start() {

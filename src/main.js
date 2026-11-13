@@ -74,7 +74,7 @@ const app = {
     if (!obj) return; await flyObjectTo(obj, anchors[anchorName], duration);
   },
   startDosimetry() { state.running = true; app.setPhase('dosimetria'); app.emit('started'); },
-  pauseDosimetry() { state.running = false; app.emit('change'); },
+  pauseDosimetry() { state.running = false; app.worker?.setActivity?.('operando'); app.emit('change'); },
   results: () => app.fw?.results?.() ?? null,
   timeOfDay: () => state.clock,
   fmtClock: WD.fmtClock,
@@ -116,6 +116,8 @@ function stepSimulation(dt) {
     const L = WD.levelOnSchedule(app.workday, state.clock, field);
     fw?.setClock?.(state.clock);
     if (L != null) { lastSimLevel = L; fw?.feed?.(L, 1, state.clock); } else fw?.feed?.(null, 1, state.clock);
+    if ((state.clock | 0) % 30 === 0) { const act = WD.activityAt(app.workday, state.clock)?.id; // movimento da trabalhadora segue a jornada
+      app.worker?.setActivity?.(act === 'operando' || act === 'setup' ? 'operando' : 'parada'); }
     if (state.clock >= app.workday.end) { state.running = false; app.emit('workdayEnd'); app.emit('change'); break; }
   }
   app.emit('tick');
