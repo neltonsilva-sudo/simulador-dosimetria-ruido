@@ -64,13 +64,32 @@ export function createUI(root, app) {
   let voiceOn = true, voice = null;
   const pickVoice = () => { const vs = speechSynthesis?.getVoices?.() || []; voice = vs.find((v) => /francisca/i.test(v.name) && /natural|online/i.test(v.name)) || vs.find((v) => /francisca/i.test(v.name)) || vs.find((v) => /luciana/i.test(v.name)) || vs.find((v) => /^pt(-|_)BR/i.test(v.lang)) || vs.find((v) => /^pt/i.test(v.lang)) || null; };
   try { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; } catch {}
+  // Narração gravada com a voz Francisca (assets/voz/<fnv1a(texto)>.mp3, gerada por tools/gen_tts.py) — funciona em
+  // qualquer navegador. Sem o arquivo (texto novo/alterado), cai na síntese de voz do navegador.
+  let vozMap = null, curAudio = null;
+  fetch('assets/voz/manifest.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null)).then((m) => (vozMap = m)).catch(() => {});
+  const fnv = (str) => { let x = 0x811c9dc5; for (const b of new TextEncoder().encode(str)) x = Math.imul(x ^ b, 0x01000193) >>> 0; return x.toString(16).padStart(8, '0'); };
+  function stopVoice() { try { speechSynthesis.cancel(); } catch {} if (curAudio) { try { curAudio.pause(); } catch {} curAudio = null; } }
+  const usingRecorded = () => !!vozMap;
   function say(text) {
     return new Promise((res) => {
-      try { speechSynthesis.cancel(); } catch {}
-      if (!voiceOn || !window.speechSynthesis) return setTimeout(res, Math.min(9000, 1200 + text.length * 45));
-      const u = new SpeechSynthesisUtterance(text.replace(/<[^>]+>/g, '')); u.lang = 'pt-BR'; if (voice) u.voice = voice; u.rate = voice && /francisca/i.test(voice.name) ? 1.0 : 1.05;
+      stopVoice();
+      const clean = text.replace(/<[^>]+>/g, '');
       let done = false; const fin = () => { if (!done) { done = true; res(); } };
-      u.onend = fin; u.onerror = fin; setTimeout(fin, 2500 + text.length * 90); speechSynthesis.speak(u);
+      const synth = () => {
+        if (!voiceOn || !window.speechSynthesis) return setTimeout(fin, Math.min(9000, 1200 + clean.length * 45));
+        const u = new SpeechSynthesisUtterance(clean); u.lang = 'pt-BR'; if (voice) u.voice = voice; u.rate = voice && /francisca/i.test(voice.name) ? 1.0 : 1.05;
+        u.onend = fin; u.onerror = fin; setTimeout(fin, 2500 + clean.length * 90); speechSynthesis.speak(u);
+      };
+      const file = vozMap?.[fnv(clean)];
+      if (voiceOn && file) {
+        const a = new Audio('assets/voz/' + file); curAudio = a; a.preload = 'auto';
+        a.onended = fin; a.onerror = () => { if (curAudio === a) { curAudio = null; synth(); } };
+        setTimeout(fin, 4000 + clean.length * 110);
+        a.play().catch(() => { if (curAudio === a) { curAudio = null; synth(); } });
+        return;
+      }
+      synth();
     });
   }
 
@@ -90,7 +109,7 @@ export function createUI(root, app) {
       setBar([soundBtn(), viewBtns(), btn('🎓 Demonstração', 'big', openDemoChooser), btn('<span class="ic">◉</span> Dosímetro', 'primary big', () => startPresentation('tudo'))]);
     } else if (p === 'apresentacao') {
       setBar([soundBtn(), btn('◀ Anterior', '', () => goStep(stepIdx - 1)), btn(`Próximo ▶`, 'primary', () => goStep(stepIdx + 1)),
-        btn(voiceOn ? '🗣 Voz' : '🔈 Voz off', 'ghost', () => { voiceOn = !voiceOn; if (!voiceOn) try { speechSynthesis.cancel(); } catch {} render(); }),
+        btn(voiceOn ? '🗣 Voz' : '🔈 Voz off', 'ghost', () => { voiceOn = !voiceOn; if (!voiceOn) stopVoice(); render(); }),
         btn('Pular demonstração ⏭', 'ghost', () => finishPresentation())]);
     } else if (p === 'pronto') {
       showCaption('Demonstração concluída', 'O dosímetro está ligado, configurado e calibrado. Agora ele será instalado na trabalhadora: sobre o ombro, preso na vestimenta, com o microfone dentro da zona auditiva.', `${steps.length}/${steps.length}`);
@@ -122,11 +141,11 @@ export function createUI(root, app) {
   }
   function voiceName() { return voice ? voice.name.replace(/^Microsoft\s+/i, '').replace(/\s*-.*$/, '') : 'voz do sistema'; }
   function openDemoChooser() {
-    const fr = voice && /francisca/i.test(voice.name);
+    const fr = usingRecorded() || (voice && /francisca/i.test(voice.name));
     modal.innerHTML = `<div class="ui-report glass ui-chooser"><button class="ui-x">✕</button><h2>Demonstração do dosímetro</h2>
       <p class="sub">Aprenda a usar, configurar e calibrar o aparelho, com o visor e as teclas reais e explicação por áudio.</p>
       <div class="ui-chapters">${CHAPTERS.map((c) => `<button class="ui-chap" data-ch="${c.id}"><b>${c.label}</b><span>${c.sub}</span><em>${(c.id === 'tudo' ? STEPS : STEPS.filter((x) => x.chapter === c.id)).length} passos</em></button>`).join('')}</div>
-      <p class="voice ${fr ? 'ok' : ''}">🗣 Narração: <b>${voiceName()}</b>${fr ? '' : ' — a voz <b>Francisca</b> (Microsoft, natural) aparece ao abrir o simulador no navegador <b>Microsoft Edge</b>.'}</p></div>`;
+      <p class="voice ${fr ? 'ok' : ''}">🗣 Narração: <b>${usingRecorded() ? 'Francisca (gravada)' : voiceName()}</b>${fr ? '' : ' — a voz <b>Francisca</b> (Microsoft, natural) aparece ao abrir o simulador no navegador <b>Microsoft Edge</b>.'}</p></div>`;
     modal.classList.remove('hidden');
     modal.querySelector('.ui-x').onclick = () => modal.classList.add('hidden');
     modal.querySelectorAll('.ui-chap').forEach((b) => (b.onclick = () => startPresentation(b.dataset.ch)));
@@ -144,7 +163,7 @@ export function createUI(root, app) {
     if (my === token && st.auto !== false && S.phase === 'apresentacao') { await new Promise((r) => setTimeout(r, 900)); if (my === token) goStep(i + 1); }
   }
   async function finishPresentation() {
-    token++; try { speechSynthesis.cancel(); } catch {}
+    token++; stopVoice();
     app.dosimeter?.highlight?.(null);
     await fwDo.ensureReady(app); // ligado + calibrado + espuma no lugar, calibrador guardado
     app.setPhase('pronto');
