@@ -115,7 +115,7 @@ export function buildHair({ THREE, add, recs, skin, hw, zB, zF, T, ear, rimY, R,
     if (i < 0 || i >= body.nx || j < 0 || j >= body.ny) return -1; const v = body.z[j * body.nx + i]; return v === 1e9 ? -1 : v; };
 
   // ── guias da cascata ──
-  const HAIR_K = +(new URLSearchParams(location.search).get('hlen') || 0.6); // comprimento (1 = abaixo das escápulas; 0,6 = altura dos ombros)
+  const HAIR_K = +(new URLSearchParams(location.search).get('hlen') || 0.45); // comprimento (1 = abaixo das escápulas; 0,6 = ombros; 0,45 = acima dos ombros)
   const NG = 190;
   for (let gI = 0; gI < NG; gI++) {
     const side = R() < 0.5 ? -1 : 1, spread = Math.pow(R(), 0.8);
