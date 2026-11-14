@@ -20,7 +20,9 @@ export function createUI(root, app) {
   const narrow = () => innerWidth < 760;
   if (narrow()) lcdWrap.classList.add('collapsed');
   lcdWrap.querySelector('.ui-cap-toggle').onclick = () => { lcdUser = true; lcdWrap.classList.toggle('collapsed'); };
-  const lcd = h('canvas'); lcd.width = 256; lcd.height = 320; lcdWrap.appendChild(lcd);
+  // painel do visor em resolução nativa da tela (pixels de 128×160 ampliados por inteiro: 2× por px CSS × devicePixelRatio)
+  const LDPR = Math.min(3, Math.max(1, Math.round(window.devicePixelRatio || 1))), LS = 2 * LDPR;
+  const lcd = h('canvas'); lcd.width = 128 * LS; lcd.height = 160 * LS; lcdWrap.appendChild(lcd);
   const keys = h('div', 'ui-keys');
   // Teclas do aparelho: toque curto ao soltar; pressão longa dispara sozinha aos 3 s com o dedo ainda no botão (como no DoseMax).
   const LONG = 3000;
@@ -237,7 +239,7 @@ export function createUI(root, app) {
       if (pg) { const t = { number: '▶❙❙ aumenta · ■ diminui · ☰ salva', options: '▶❙❙ sobe · ■ desce · ☰ salva', fields: '▶❙❙ + · ■ − · ☰ próximo campo', records: '▶❙❙ sobe · ■ desce · ☰ abre', info: 'qualquer tecla volta', calibrar: '' };
         return `${tips[key] ? tips[key] + '<br>' : ''}${t[pageType(key)] ?? ''}`; }
       const where = path[path.length - 1];
-      return `Menu <b>${where}</b>: ▶❙❙ sobe · ■ desce · ☰ entra. “Voltar” sobe um nível; ☰ por 3 s sai do menu.${where === 'ajustes' ? '<br>Ajustes valem só para o critério <b>USER</b> (NHO-01 e NR-15 são fixos).' : ''}`;
+      return `Menu <b>${({ main: "principal", dosimetria: "Dosimetria", ajustes: "Ajustes", sistema: "Sistema" })[where] || where}</b>: ▶❙❙ sobe · ■ desce · ☰ entra. “Voltar” sobe um nível; ☰ por 3 s sai do menu.${where === 'ajustes' ? '<br>Ajustes valem só para o critério <b>USER</b> (NHO-01 e NR-15 são fixos).' : ''}`;
     }
     if (f.mode === 'run' || f.mode === 'pause') return `<b>${f.mode === 'run' ? 'Gravando' : 'Pausado'}.</b> ▶❙❙/■ trocam a tela · ▶❙❙ 3 s ${f.mode === 'run' ? 'pausa' : 'retoma'} · ■ 3 s para e pós-calibra. Menu bloqueado durante a dosimetria.`;
     if (f.mode === 'countdown') return 'Iniciando em instantes (indicador vermelho piscando).';
@@ -246,10 +248,24 @@ export function createUI(root, app) {
   function pageType(key) { const t = { taxa: 'number', criterio: 'number', limiar: 'number', intervalo: 'number', pfreq: 'options', ptemp: 'options', agenda: 'options', apagar: 'options', filtros: 'options', idioma: 'options', duracao: 'fields', datahora: 'fields', tela: 'fields', registros: 'records', sobre: 'info', calibrar: 'calibrar' }; return t[key]; }
   // ── atualização contínua (visor ampliado, painel vivo, dashboard) ──
   const lctx = lcd.getContext('2d'); lctx.imageSmoothingEnabled = false;
+  // grade fina entre os pixels (aspecto de LCD) só quando cada pixel tem ≥ 4 px físicos — fica nítida, sem chuvisco
+  let gridPat = null;
+  if (LS >= 4) { const g = document.createElement('canvas'); g.width = g.height = LS; const gx = g.getContext('2d');
+    gx.fillStyle = 'rgba(0,0,0,0.32)'; gx.fillRect(LS - 1, 0, 1, LS); gx.fillRect(0, LS - 1, LS, 1); gridPat = lctx.createPattern(g, 'repeat'); }
+  function drawPanelLCD() {
+    const fw = app.fw, nc = fw?.nativeCanvas, W = lcd.width, H = lcd.height;
+    if (!nc) { lctx.imageSmoothingEnabled = true; lctx.drawImage(fw.canvas, 0, 0, W, H); return; }
+    const bl = fw.backlight ? fw.backlight() : 1;
+    lctx.globalAlpha = 1; lctx.imageSmoothingEnabled = false; lctx.fillStyle = '#030405'; lctx.fillRect(0, 0, W, H);
+    if (bl <= 0.001) return;
+    lctx.drawImage(nc, 0, 0, W, H);
+    if (gridPat) { lctx.fillStyle = gridPat; lctx.fillRect(0, 0, W, H); }
+    if (bl < 0.999) { lctx.fillStyle = `rgba(3,4,5,${1 - bl})`; lctx.fillRect(0, 0, W, H); }
+  }
   let acc = 0;
   app.stage.onFrame((dt) => {
     acc += dt; if (acc < 0.1) return; acc = 0;
-    if (app.fw?.canvas && !lcdWrap.classList.contains('hidden')) { lctx.drawImage(app.fw.canvas, 0, 0, 256, 320); const kh = keyHelp(); if (ctxHelp.innerHTML !== kh) ctxHelp.innerHTML = kh; }
+    if (app.fw?.canvas && !lcdWrap.classList.contains('hidden')) { drawPanelLCD(); const kh = keyHelp(); if (ctxHelp.innerHTML !== kh) ctxHelp.innerHTML = kh; }
     const L = app.fieldLevel(app.micWorld());
     const act = S.running ? app.WD.activityAt(app.workday, S.clock) : null;
     live.innerHTML = `<div><span>Nível no microfone</span><b>${f1(app.instantLevel())} <small>dB(A)</small></b></div><div><span>Campo no posto</span><b>${f1(L)} <small>dB(A)</small></b></div><div><span>Horário</span><b>${app.fmtClock(S.clock)}</b></div>${act ? `<div class="wide"><span>Atividade</span><b>${act.label}</b></div>` : ''}`;

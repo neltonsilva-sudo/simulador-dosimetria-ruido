@@ -10,7 +10,7 @@ export function createFirmware({ app, getInput } = {}) {
   let drawnRev = -1, sinceDraw = 1, prevPower = core.state.power, offT = null; // offT: transição de desligar (s)
   const OFF_S = 0.9;
   const fw = {
-    canvas: lcd.canvas, dirty: true, state: core.state, core,
+    canvas: lcd.canvas, nativeCanvas: lcd.native, backlight: () => lcd.backlight, dirty: true, state: core.state, core,
     press: (key, holdMs = 0) => { const was = core.state.power; core.press(key, holdMs); if (was !== 'off' && core.state.power === 'off') { offT = 0; prevPower = 'off'; } redraw(true); },
     update(dt) {
       core.update(dt); sinceDraw += dt || 0;

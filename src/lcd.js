@@ -287,7 +287,9 @@ export function createLCD() {
   }
 
   // ── composição 512×640 com aspecto de TFT ──
+  let lastBl = 0;
   function compose(bl) {
+    lastBl = bl;
     nctx.putImageData(img, 0, 0);
     ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
     ctx.fillStyle = '#030405'; ctx.fillRect(0, 0, W, H);
@@ -333,5 +335,5 @@ export function createLCD() {
     const b = s.settings.brightness;
     compose(b >= 10 ? 1 : 0.35 + 0.065 * b);
   }
-  return { canvas, draw, native: nc };
+  return { canvas, draw, native: nc, get backlight() { return lastBl; } };
 }
