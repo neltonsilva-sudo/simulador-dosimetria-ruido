@@ -55,6 +55,19 @@ function outlineOf(mesh, color = 0xffd54a, grow = 1.0) {
   mesh.add(o); return o;
 }
 
+/** anel de destaque nítido em volta de uma tecla 8,6×8,4 mm (plano, espessura uniforme, brilho com bloom) */
+function keyRing(key) {
+  const g = new THREE.Group(); g.visible = false; g.renderOrder = 4;
+  const mk = (ow, oh, or, iw, ih, ir, col, op) => {
+    const sh = roundRectArc(ow, oh, or); sh.holes.push(roundRectArc(iw, ih, ir, 0, 0, THREE.Path));
+    const m = new THREE.Mesh(new THREE.ShapeGeometry(sh, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(col), transparent: true, opacity: op, depthWrite: false, toneMapped: false }));
+    m.userData.noAO = true; m.userData.baseOpacity = op; g.add(m); return m;
+  };
+  mk(10.3, 10.1, 2.9, 9.1, 8.9, 2.4, 0xffd54a, 1.0).material.color.multiplyScalar(2.2); // traço nítido
+  mk(11.6, 11.4, 3.5, 10.3, 10.1, 2.9, 0xffc21a, 0.35);                                  // halo suave por fora
+  g.position.set(key.position.x, key.position.y, key.position.z - 0.55);                 // na moldura, em volta da tecla (não afunda com ela)
+  key.parent.add(g); return g;
+}
 export function buildDosimeter(stage, fw, app) {
   const group = new THREE.Group(); group.name = 'DoseMax';
   const B = new THREE.Group(); B.scale.setScalar(MM); group.add(B);
@@ -150,7 +163,7 @@ export function buildDosimeter(stage, fw, app) {
     const m = add(keyGeo, keyMat); m.position.set(-15.75 + i * 10.5, -25.2, FRONT + 0.85); m.name = 'tecla_' + k; m.userData.key = k;
     const ig = new THREE.ExtrudeGeometry(iconShapes(k, 1.0), { depth: 0.04, bevelEnabled: false, curveSegments: 16 });
     const ic = new THREE.Mesh(ig, icoMat); ic.position.z = 1.2; ic.userData.key = k; m.add(ic);
-    keys[k] = m; keyRest[k] = m.position.z; keyOutline[k] = outlineOf(m, 0xffd54a, 0.9);
+    keys[k] = m; keyRest[k] = m.position.z; keyOutline[k] = keyRing(m);
   });
   // ── LED (canto superior direito da moldura, item 6 do manual) ──
   const ledMat = new THREE.MeshPhysicalMaterial({ color: 0x1a1210, roughness: 0.08, clearcoat: 1, emissive: 0x000000, emissiveIntensity: 3, toneMapped: false });
@@ -229,7 +242,7 @@ export function buildDosimeter(stage, fw, app) {
   const extraOutline = { screen: outlineOf(lens, 0xffd54a, 0.9), led: outlineOf(led, 0xffd54a, 0.8), mic: outlineOf(cap, 0xffd54a, 0.9), usb: outlineOf(usbHole, 0xffd54a, 1.2) };
   function highlight(key) {
     hl = key; Object.values(keyOutline).concat(Object.values(extraOutline)).forEach((o) => (o.visible = false));
-    const list = key === 'power+menu' ? ['power', 'menu'] : key ? [key] : [];
+    const list = key === 'power+menu' ? ['power', 'menu'] : key === 'all' ? Object.keys(keys) : key ? [key] : [];
     list.forEach((k) => { const o = keyOutline[k] || extraOutline[k]; if (o) o.visible = true; });
   }
   function setWindscreen(on) { wsTarget = on ? 1 : 0; }
@@ -279,14 +292,17 @@ export function buildDosimeter(stage, fw, app) {
       if (pulses[k] > 0) pulses[k] -= dt;
       const down = holding(k) || holding('power+menu') && (k === 'power' || k === 'menu') || pulses[k] > 0;
       press[k] += ((down ? 1 : 0) - press[k]) * Math.min(1, dt * 28);
-      keys[k].position.z = keyRest[k] - press[k] * 0.95;
+      keys[k].position.z = keyRest[k] - press[k] * 0.95 + (keys[k].userData.hlLift || 0);
     }
     // LED (cor do firmware; pisca se o firmware indicar)
     const st = fw?.state || {}; const c = LED_COL[st.led];
     ledPhase += dt; const blink = st.ledBlink || st.blink ? Math.sin(ledPhase * Math.PI * 2) > 0 : true;
     if (c && blink) ledMat.emissive.setHex(c); else ledMat.emissive.setHex(0x000000);
     // highlight pulsante
-    if (hl) { hlT += dt; const a = 0.45 + 0.45 * Math.sin(hlT * 6); Object.values(keyOutline).concat(Object.values(extraOutline)).forEach((o) => { if (o.visible) o.material.opacity = a; }); }
+    if (hl) { hlT += dt; const a = 0.45 + 0.45 * Math.sin(hlT * 6), p = 0.8 + 0.2 * Math.sin(hlT * 5);
+      Object.values(extraOutline).forEach((o) => { if (o.visible) o.material.opacity = a; });
+      for (const k in keyOutline) { const o = keyOutline[k]; if (!o.visible) continue; o.children.forEach((c) => (c.material.opacity = c.userData.baseOpacity * p)); } }
+    for (const k in keys) { const up = keyOutline[k].visible ? 0.45 : 0; keys[k].userData.hlLift = (keys[k].userData.hlLift || 0) + (up - (keys[k].userData.hlLift || 0)) * Math.min(1, dt * 10); }
     // espuma sai/volta
     ws += (wsTarget - ws) * Math.min(1, dt * 5); if (Math.abs(ws - wsTarget) < 0.002) ws = wsTarget;
     foamPivot.visible = ws > 0.02; foamPivot.position.y = 63.2 + (1 - ws) * 34; foamPivot.rotation.z = (1 - ws) * 0.5;

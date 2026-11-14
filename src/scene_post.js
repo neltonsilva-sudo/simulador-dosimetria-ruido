@@ -162,9 +162,17 @@ vec3 fetch(vec2 uv){
   vec4 a = texture2D(tA, uv);
   if (useDof > 0.5) {
     float sz = clamp(amountFull * abs(a.a - focus) / max(a.a, 0.05) * (a.a < focus ? nearK : 1.0), 0.0, 60.0);
+    // Ampliação da meia resolução SENSÍVEL À PROFUNDIDADE: só pesam as amostras cujo desfoque (a = CoC em meia res.)
+    // é parecido com o deste pixel — o fundo borrado não "puxa" a cor do objeto em foco (sem halo), e o objeto em foco
+    // não é trocado pela versão borrada na borda (a mistura depende só do próprio CoC).
     vec2 o = dofTexel * clamp(sz * 0.2, 0.5, 2.6);
-    vec4 b = texture2D(tDof, uv) * 0.36 + (texture2D(tDof, uv + vec2(o.x, o.y)) + texture2D(tDof, uv - vec2(o.x, o.y)) + texture2D(tDof, uv + vec2(o.x, -o.y)) + texture2D(tDof, uv - vec2(o.x, -o.y))) * 0.16; float m = max(smoothstep(0.6, 2.2, sz), smoothstep(0.4, 1.6, b.a * 2.0));
-    a.rgb = mix(a.rgb, b.rgb, m);
+    vec4 t0 = texture2D(tDof, uv), t1 = texture2D(tDof, uv + vec2(o.x, o.y)), t2 = texture2D(tDof, uv - vec2(o.x, o.y)),
+         t3 = texture2D(tDof, uv + vec2(o.x, -o.y)), t4 = texture2D(tDof, uv - vec2(o.x, -o.y));
+    float k0 = 0.36 / (0.35 + abs(t0.a * 2.0 - sz)), k1 = 0.16 / (0.35 + abs(t1.a * 2.0 - sz)), k2 = 0.16 / (0.35 + abs(t2.a * 2.0 - sz)),
+          k3 = 0.16 / (0.35 + abs(t3.a * 2.0 - sz)), k4 = 0.16 / (0.35 + abs(t4.a * 2.0 - sz));
+    vec3 b = (t0.rgb * k0 + t1.rgb * k1 + t2.rgb * k2 + t3.rgb * k3 + t4.rgb * k4) / (k0 + k1 + k2 + k3 + k4);
+    float m = smoothstep(0.6, 2.2, sz);
+    a.rgb = mix(a.rgb, b, m);
   }
   return a.rgb;
 }
