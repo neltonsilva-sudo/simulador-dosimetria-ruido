@@ -80,12 +80,12 @@ export function createUI(root, app) {
       let done = false; const fin = () => { if (!done) { done = true; res(); } };
       const synth = () => {
         if (!voiceOn || !window.speechSynthesis) return setTimeout(fin, Math.min(9000, 1200 + clean.length * 45));
-        const u = new SpeechSynthesisUtterance(clean); u.lang = 'pt-BR'; if (voice) u.voice = voice; u.rate = voice && /francisca/i.test(voice.name) ? 1.0 : 1.05;
+        const u = new SpeechSynthesisUtterance(clean); u.lang = 'pt-BR'; if (voice) u.voice = voice; u.rate = voice && /francisca/i.test(voice.name) ? 1.0 : 1.05; u.volume = Math.min(1, voiceVol() * 1.2);
         u.onend = fin; u.onerror = fin; setTimeout(fin, 2500 + clean.length * 90); speechSynthesis.speak(u);
       };
       const file = vozMap?.[fnv(clean)];
       if (voiceOn && file) {
-        const a = new Audio('assets/voz/' + file); curAudio = a; a.preload = 'auto';
+        const a = new Audio('assets/voz/' + file); curAudio = a; a.preload = 'auto'; a.volume = Math.min(1, voiceVol() * 1.2);
         a.onended = fin; a.onerror = () => { if (curAudio === a) { curAudio = null; synth(); } };
         setTimeout(fin, 4000 + clean.length * 110);
         a.play().catch(() => { if (curAudio === a) { curAudio = null; synth(); } });
@@ -97,7 +97,19 @@ export function createUI(root, app) {
 
   function btn(label, cls, fn) { const b = h('button', 'ui-btn ' + (cls || ''), label); b.onclick = fn; return b; }
   function setBar(items) { bar.innerHTML = ''; items.forEach((i) => i && bar.appendChild(i)); }
-  const soundBtn = () => btn(app.audio?.muted ? '🔇 Som' : '🔊 Som', 'ghost', () => { app.audio?.start?.(); app.audio?.setMuted?.(!app.audio?.muted); render(); });
+  // som: botão liga/desliga + barra de volume (máquinas, bipes, calibrador e narração)
+  const volIcon = () => (app.audio?.muted || (app.audio?.volume ?? 0.7) === 0 ? '🔇' : (app.audio?.volume ?? 0.7) < 0.4 ? '🔈' : '🔊');
+  const soundBtn = () => {
+    const w = h('div', 'ui-vol');
+    const b = h('button', 'ui-btn ghost ui-vol-btn', volIcon()); b.title = 'Som liga/desliga';
+    const r = h('input'); r.type = 'range'; r.min = 0; r.max = 100; r.step = 1; r.value = Math.round((app.audio?.volume ?? 0.7) * 100); r.title = 'Volume'; r.setAttribute('aria-label', 'Volume');
+    const paint = () => { r.style.setProperty('--v', r.value + '%'); b.textContent = volIcon(); };
+    b.onclick = () => { app.audio?.start?.(); app.audio?.setMuted?.(!app.audio?.muted); applyVoiceVol(); paint(); };
+    r.oninput = () => { app.audio?.start?.(); if (app.audio?.muted && +r.value > 0) app.audio.setMuted(false); app.audio?.setVolume?.(+r.value / 100); applyVoiceVol(); paint(); };
+    paint(); w.append(b, r); return w;
+  };
+  const voiceVol = () => (app.audio?.muted ? 0 : app.audio?.volume ?? 0.7);
+  function applyVoiceVol() { if (curAudio) curAudio.volume = Math.min(1, voiceVol() * 1.2); }
   const viewBtns = () => { const w = h('div', 'ui-seg'); for (const [v, l] of [['ref', 'Foto'], ['station', 'Posto'], ['overview', 'Galpão']]) w.appendChild(btn(l, 'seg', () => app.setView(v, { animate: true }))); return w; };
 
   // ── fases ──

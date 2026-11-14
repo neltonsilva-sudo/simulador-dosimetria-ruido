@@ -4,6 +4,8 @@ import { MACHINES } from './layout_machines.js';
 
 export function createAudio(stage, app) {
   let ctx = null, master = null, muffle = null, started = false, muted = false;
+  let vol = 0.7; try { const v = parseFloat(localStorage.getItem('dosi.vol')); if (v >= 0 && v <= 1) vol = v; } catch {}
+  const gainFor = () => (muted ? 0 : 0.8 * vol * vol * 1.4); // curva perceptual (≈ 0,55 em 70 %)
   const voices = {}; let toneOsc = null, toneGain = null;
 
   function noiseBuffer(sec = 2, color = 'white') {
@@ -21,7 +23,7 @@ export function createAudio(stage, app) {
 
   function build() {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
-    master = ctx.createGain(); master.gain.value = 0.55;
+    master = ctx.createGain(); master.gain.value = gainFor();
     muffle = ctx.createBiquadFilter(); muffle.type = 'lowpass'; muffle.frequency.value = 18000;
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
     master.connect(muffle).connect(comp).connect(ctx.destination);
@@ -70,7 +72,10 @@ export function createAudio(stage, app) {
   const api = {
     start() { if (!ctx) build(); ctx.resume?.(); started = true; },
     get started() { return started; },
-    setMuted(b) { muted = b; if (master) master.gain.setTargetAtTime(b ? 0 : 0.55, ctx.currentTime, 0.05); },
+    setMuted(b) { muted = b; if (master) master.gain.setTargetAtTime(gainFor(), ctx.currentTime, 0.05); },
+    setVolume(v) { vol = Math.max(0, Math.min(1, +v)); try { localStorage.setItem('dosi.vol', String(vol)); } catch {}
+      if (master) master.gain.setTargetAtTime(gainFor(), ctx.currentTime, 0.04); },
+    get volume() { return vol; },
     get muted() { return muted; },
     setRunning,
     setEarplugs(b) { if (muffle) muffle.frequency.setTargetAtTime(b ? 900 : 18000, ctx.currentTime, 0.1); },
