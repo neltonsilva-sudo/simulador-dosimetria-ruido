@@ -77,10 +77,11 @@ export function createUI(root, app) {
     return new Promise((res) => {
       stopVoice();
       const clean = text.replace(/<[^>]+>/g, '');
+      const spoken = clean.replace(/\bNHO[- ]?0?1\b/g, 'ene agá ó zero um').replace(/\bNHO\b/g, 'ene agá ó'); // sigla soletrada na voz do navegador
       let done = false; const fin = () => { if (!done) { done = true; res(); } };
       const synth = () => {
         if (!voiceOn || !window.speechSynthesis) return setTimeout(fin, Math.min(9000, 1200 + clean.length * 45));
-        const u = new SpeechSynthesisUtterance(clean); u.lang = 'pt-BR'; if (voice) u.voice = voice; u.rate = voice && /francisca/i.test(voice.name) ? 1.0 : 1.05; u.volume = Math.min(1, voiceVol() * 1.2);
+        const u = new SpeechSynthesisUtterance(spoken); u.lang = 'pt-BR'; if (voice) u.voice = voice; u.rate = voice && /francisca/i.test(voice.name) ? 1.0 : 1.05; u.volume = Math.min(1, voiceVol() * 1.2);
         u.onend = fin; u.onerror = fin; setTimeout(fin, 2500 + clean.length * 90); speechSynthesis.speak(u);
       };
       const file = vozMap?.[fnv(clean)];

@@ -271,8 +271,9 @@ export async function buildWorker(stage, app) {
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vRest;\n' + VEST_GLSL).replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif (vestD(vRest) < 0.0) discard;');
   };
   vestDepth.customProgramCacheKey = () => 'vestDepth';
+  const VEST_OFF = +(new URLSearchParams(location.search).get('voff') || 2.7); // folga (cm) do colete sobre o uniforme
   const vest = makeShell((x, y, z, arm) => (!arm || (y > 127 && Math.abs(x) < 18.5)) && y > 92 && y < 151 && Math.abs(x) < 19.5,
-    (x, y, z) => 4.6 + (y > 134 ? 0.9 : 0) + (Math.abs(x) > 13 ? 0.8 : 0) + (z > 2 && y < 122 ? (122 - y) * 0.06 : 0) + Math.max(0, 100 - y) * 0.08, vestMat);
+    (x, y, z) => VEST_OFF + (y > 134 ? 0.5 : 0) + (Math.abs(x) > 13 ? 0.4 : 0) + (z > 2 && y < 122 ? (122 - y) * 0.025 : 0) + Math.max(0, 100 - y) * 0.03, vestMat); // mais justo ao corpo
   vest.customDepthMaterial = vestDepth;
   vest.name = 'colete';
 
