@@ -174,13 +174,14 @@ export function buildHair({ THREE, add, recs, skin, hw, zB, zF, T, ear, rimY, R,
 
   // ── miolo escuro (evita ver através da massa) ──
   {
-    const coreMat = new THREE.MeshStandardMaterial({ color: 0x2a1a10, roughness: 0.9 });
+    const coreMat = new THREE.MeshStandardMaterial({ color: 0x1e130c, roughness: 0.95 }); const coreGeo = new THREE.SphereGeometry(1, 18, 12);
     const byY = [...cen.entries()].sort((a, b) => b[0] - a[0]);
-    for (const [k, e] of byY) { const y = k * 0.03; if (y > -0.01 || y < -0.3) continue;
+    const CORE = new URLSearchParams(location.search).get('hcore') || 'off'; // padrão: sem miolo (os discos escuros apareciam sob os cachos); 'top' ou 'full' para testar
+    for (const [k, e] of byY) { const y = k * 0.03; if (y > -0.01 || y < (CORE === 'full' ? -0.3 : -0.1) || CORE === 'off') continue;
       const pts = placed.filter((it) => Math.round(it.p.y / 0.03) === k);
       const cx = e[0] / e[2], cz = e[1] / e[2];
       const sx = Math.max(0.015, Math.sqrt(pts.reduce((a, it) => a + (it.p.x - cx) ** 2, 0) / pts.length)), sz = Math.max(0.012, Math.sqrt(pts.reduce((a, it) => a + (it.p.z - cz) ** 2, 0) / pts.length));
-      const m = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), coreMat); m.scale.set(sx * 1.2, 0.03, sz * 1.1); m.position.set(cx, y - 0.04, cz); m.castShadow = true; cascade.add(m); }
+      const m = new THREE.Mesh(coreGeo, coreMat); m.scale.set(sx * 0.6, 0.05, sz * 0.55); m.position.set(cx, y - 0.04, cz); m.castShadow = true; cascade.add(m); } // menor que a massa de cachos e sobreposto (sem bordas à vista)
   }
 
   // ── mechas laterais puxadas para trás, sob a aba (têmpora → acima da orelha → nuca) ──
