@@ -164,6 +164,5 @@ export async function buildUniform({ fbx, bones, mgr, inject, NOISE }) {
   m01.matrixWorld.decompose(mesh.position, mesh.quaternion, mesh.scale);
   fbx.add(mesh); mesh.updateMatrixWorld(true);
   mesh.bind(new THREE.Skeleton(mapped, inv), G.clone().multiply(m01.bindMatrix));
-  mesh.userData.dbg = { pk: pk.toArray(), sh: sh.toArray(), el: el.toArray(), bind: m01.bindMatrix.elements.map((x) => +x.toFixed(3)), mw: m01.matrixWorld.elements.map((x) => +x.toFixed(3)) };
   return { mesh, pants: true, sleeves: true };
 }

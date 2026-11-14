@@ -151,7 +151,7 @@ function leatherMat() {
       { vec3 p = vB * 1100.0; float e = 0.35; float a = 1.0 - smoothstep(0.4, 1.2, length(fwidth(p)));
         vec3 gr = vec3(vn(p + vec3(e,0,0)) - vn(p - vec3(e,0,0)), vn(p + vec3(0,e,0)) - vn(p - vec3(0,e,0)), vn(p + vec3(0,0,e)) - vn(p - vec3(0,0,e)));
         float fl = smoothstep(0.08, 0.095, vB.z) * smoothstep(0.112, 0.1, vB.z) * sin(vB.z * 600.0 + 4.0 * vn(vB * 90.0)) * smoothstep(0.02, 0.0, abs(vB.x) - 0.02);
-        normal = normalize(normal - mat3(viewMatrix) * (gr * 0.18 * a + vec3(0.0, 0.0, fl * 0.25))); }`);
+        normal = normalize(normal - mat3(viewMatrix) * (gr * 0.09 * a + vec3(0.0, 0.0, fl * 0.2))); }`);
   };
   m.customProgramCacheKey = () => 'botinaCouro';
   return m;

@@ -1,6 +1,7 @@
 // TRABALHADORA — dono: TRABALHADORA. Base realista: Microsoft Rocketbox Female_Adult_11 (MIT, assets/rocketbox/F11).
-// Recoloração no espaço de textura preservando luminância/dobras: pele negra/parda, blusa → camisa branca com mangas
-// dobradas até o cotovelo (antebraço nu), saia → fralda curta da camisa, pernas → calça escura, botas pretas,
+// UNIFORME INDUSTRIAL (worker_uniform.js): camisa de brim marinho manga longa + calça do mesmo tecido (malhas da F01);
+// BOTINA DE SEGURANÇA (worker_boots.js) no lugar da bota de salto. Reserva sem uniforme: recoloração do atlas (camisa branca,
+// mangas dobradas, fralda, calça escura, botas pretas),
 // luvas pretas de malha com punho amarelo, tatuagem fina no antebraço direito interno; colete laranja refletivo (casca solta);
 // pose operando o painel (IK de 2 ossos até app.machines.panelButton), olhar para a tela, respiração, piscar.
 // Rosto/capacete/óculos/plugs/cabelo: módulo ROSTO (worker_head.js) via gancho buildHead; aqui só versões de reserva.
@@ -371,7 +372,7 @@ export async function buildWorker(stage, app) {
   //    ponta do microfone a ~150–180 mm do canal auditivo do mesmo lado (zona auditiva NHO-01: 150 ± 50 mm) ──
   const chest = holderOn(B.Spine2);
   const mk = (par, pos, ry = 0, rx = 0, rz = 0) => { const o = new THREE.Object3D(); o.position.copy(pos); o.rotation.set(rx, ry, rz, 'YXZ'); par.add(o); return o; };
-  const DOSI = { x: 6.0, y: 137.0, z: 7.7, ry: 0.2, rx: -0.3, rz: -0.16 }; // cm do modelo (repouso)
+  const DOSI = { x: 6.0, y: 137.6, z: 7.2, ry: 0.2, rx: -0.32, rz: -0.16 }; // cm do modelo (repouso)
   const anchors = {
     shoulderL: mk(chest, relTo(B.Spine2, [DOSI.x, DOSI.y, DOSI.z]), DOSI.ry, DOSI.rx, DOSI.rz),
     shoulderR: mk(chest, relTo(B.Spine2, [-DOSI.x, DOSI.y, DOSI.z]), -DOSI.ry, DOSI.rx, -DOSI.rz),
