@@ -103,9 +103,10 @@ export async function buildHead({ THREE, stage, app, root, skinned, bones, headB
   let seed = 11; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 
   // ── capacete classe B, aba frontal ──
-  const RX = hw + 0.019, RZ = (zF - zB) / 2 + 0.035, rimY = 0.047, HH = Math.max(0.12, T - rimY + 0.066);
+  // casco justo (~15 % menor que a 1ª versão): folga lateral ~6 mm, testa ~1 cm, nuca ~2 cm, ~3,5 cm de suspensão sobre o topo
+  const RX = hw + 0.0055, RZ = (zF - zB) / 2 + 0.0145, rimY = 0.042, HH = Math.max(0.104, T - rimY + 0.036), TILT = -0.11;
   const helmet = add(new THREE.Group()); helmet.name = 'capacete';
-  helmet.position.set(0, rimY, (zF + zB) / 2 - 0.004); helmet.rotation.x = -0.2;
+  helmet.position.set(0, rimY, (zF + zB) / 2 - 0.004); helmet.rotation.x = TILT;
   const hTex = mkHelmetTex(THREE);
   let envL = null; try { envL = mkCeilingEnv(THREE, stage?.renderer); } catch (e) { envL = null; }
   const white = new THREE.MeshPhysicalMaterial({ color: 0xfbfaf6, map: hTex.map, roughnessMap: hTex.rough, roughness: 0.55, bumpMap: hTex.bump, bumpScale: 0.25,
@@ -130,9 +131,9 @@ export async function buildHead({ THREE, stage, app, root, skinned, bones, headB
     const BA = 120, NR = 5, bp = [], buv = [], bi = [], edge = [];
     for (let i = 0; i <= BA; i++) {
       const a = i / BA * Math.PI * 2, base = shellR(a, 0), ca = Math.cos(a), fr = Math.pow(Math.max(0, ca), 3.2);
-      const off = 0.0045 + 0.037 * fr, dir = V3(base.x / RX / RX, 0, base.z / RZ / RZ).normalize();
+      const off = 0.004 + 0.031 * fr, dir = V3(base.x / RX / RX, 0, base.z / RZ / RZ).normalize();
       for (let k = 0; k <= NR; k++) { const t = k / NR;
-        const o = base.clone().addScaledVector(dir, off * t); o.y += 0.001 - (0.003 + 0.013 * fr) * t * t - 0.003 * Math.pow(Math.max(0, -ca), 2) * t;
+        const o = base.clone().addScaledVector(dir, off * t); o.y += 0.001 - (0.003 + 0.011 * fr) * t * t - 0.003 * Math.pow(Math.max(0, -ca), 2) * t;
         bp.push(o.x, o.y, o.z); buv.push(i / BA, 0.04 * t); if (k === NR) edge.push(o); }
     }
     for (let i = 0; i < BA; i++) for (let k = 0; k < NR; k++) { const a = i * (NR + 1) + k, b = a + NR + 1; bi.push(a, b, a + 1, a + 1, b, b + 1); }
@@ -150,9 +151,9 @@ export async function buildHead({ THREE, stage, app, root, skinned, bones, headB
     // suspensão: carneira (faixa), tira de nuca com catraca
     const susM = new THREE.MeshStandardMaterial({ color: 0x1c1c1e, roughness: 0.75, side: THREE.DoubleSide });
     const band = add(new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.02, 48, 1, true), susM), helmet);
-    band.scale.set(RX - 0.022, 1, RZ - 0.024); band.position.set(0, 0.006, -0.004);
-    const nz = -(RZ - 0.012);
-    add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V3(-(RX - 0.02), -0.004, -0.04), V3(-(RX - 0.035), -0.026, nz * 0.8), V3(0, -0.034, nz), V3(RX - 0.035, -0.026, nz * 0.8), V3(RX - 0.02, -0.004, -0.04)]), 24, 0.0055, 5), susM), helmet);
+    band.scale.set(RX - 0.009, 1, RZ - 0.012); band.position.set(0, 0.006, -0.004);
+    const nz = -(RZ - 0.006);
+    add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V3(-(RX - 0.01), -0.004, -0.04), V3(-(RX - 0.022), -0.026, nz * 0.8), V3(0, -0.034, nz), V3(RX - 0.022, -0.026, nz * 0.8), V3(RX - 0.01, -0.004, -0.04)]), 24, 0.0055, 5), susM), helmet);
     const ratchet = add(new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, 0.011, 16), susM), helmet); ratchet.rotation.x = Math.PI / 2; ratchet.position.set(0, -0.034, nz - 0.006);
   }
   // jugular preta com estampa amarela, solta: desce atrás da orelha e passa pela nuca (como na foto, sem cruzar o queixo)
@@ -230,7 +231,7 @@ export async function buildHead({ THREE, stage, app, root, skinned, bones, headB
         if (ix >= 0 && ix < nx && jy >= 0 && jy < ny && tmp.z < z[jy * nx + ix]) z[jy * nx + ix] = tmp.z; } }
     return { nx, ny, z };
   })();
-  const hair = buildHair({ THREE, add, recs, skin, hw, zB, zF, T, ear, rimY, R, body });
+  const hair = buildHair({ THREE, add, recs, skin, hw, zB, zF, T, ear, rimY: rimY - 0.013, R, body }); // casco justo: cabelo sai 13 mm mais baixo, sem atravessar a aba
   dbg.hair = hair.count;
   frame.userData.dbg = dbg;
 

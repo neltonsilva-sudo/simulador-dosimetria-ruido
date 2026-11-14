@@ -18,7 +18,8 @@ const lum = (r, g, b) => 0.3 * r + 0.59 * g + 0.11 * b;
 const sat = (x) => Math.max(0, Math.min(255, x));
 
 // ── recoloração do atlas do corpo (coordenadas de imagem normalizadas) ──
-function recolorBody(im) {
+function recolorBody(im, navy = false) {
+  const SHIRT = navy ? [30, 44, 70] : [242, 240, 234]; // camisa: marinho do uniforme (casca sob a malha da F01) ou branca
   const S = 2048, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'); g.drawImage(im, 0, 0, S, S);
   const d = g.getImageData(0, 0, S, S), p = d.data;
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
@@ -27,11 +28,11 @@ function recolorBody(im) {
     const skin = r > 120 && r > gg && gg > b && r - b > 35;
     if (side && v < 0.235 && (u < 0.2 || u > 0.8)) { const k = 4 + L * 0.05; p[i] = k; p[i + 1] = k; p[i + 2] = k * 1.08; }            // mãos → luva preta de malha
     else if (side && v >= 0.11 && v < 0.29 && u > 0.13 && u < 0.87) { const k = L * 0.32; p[i] = k; p[i + 1] = k; p[i + 2] = k * 1.05; } // cano da bota
-    else if (side && v >= 0.27 && v < 0.41) { const k = Math.min(1.0, 0.82 + (L - 40) / 300); p[i] = sat(236 * k); p[i + 1] = sat(234 * k); p[i + 2] = sat(228 * k); } // cinto → camisa por cima
+    else if (side && v >= 0.27 && v < 0.41) { const k = Math.min(1.0, 0.82 + (L - 40) / 300); p[i] = sat(SHIRT[0] * 0.97 * k); p[i + 1] = sat(SHIRT[1] * 0.97 * k); p[i + 2] = sat(SHIRT[2] * 0.97 * k); } // cinto → camisa por cima
     else if (side && v >= 0.585 && v < 0.85) { const k = 0.55 + L / 300; p[i] = sat(36 * k); p[i + 1] = sat(40 * k); p[i + 2] = sat(50 * k); } // pernas → calça escura
     else if (side && v >= 0.85) { const k = L * 0.33; p[i] = k; p[i + 1] = k; p[i + 2] = k * 1.04; }                                  // botas pretas
     else if (skin) { p[i] = sat(r * 0.6); p[i + 1] = sat(gg * 0.45); p[i + 2] = sat(b * 0.37); }                                       // pele do decote
-    else { const k = Math.min(1.04, 0.8 + (L - 52) / 260); p[i] = sat(242 * k); p[i + 1] = sat(240 * k); p[i + 2] = sat(234 * k); }   // blusa/saia → camisa branca
+    else { const k = Math.min(1.04, 0.8 + (L - 52) / 260); p[i] = sat(SHIRT[0] * k); p[i + 1] = sat(SHIRT[1] * k); p[i + 2] = sat(SHIRT[2] * k); }   // blusa/saia → camisa
   }
   g.putImageData(d, 0, 0); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
 }
@@ -107,6 +108,8 @@ export async function buildWorker(stage, app) {
   let mesh; fbx.traverse((o) => { if (o.isSkinnedMesh) mesh = o; if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   const skinned = mesh, geo = mesh.geometry, skel = mesh.skeleton;
   const B = {}; for (const b of skel.bones) B[b.name.replace(/^Bip01_?/, '') || 'Root'] = b;
+  const HAND_K = 0.88; // mãos (com a luva) 12 % menores — pedido do usuário; o alcance do braço compensa abaixo
+  for (const sd of ['L', 'R']) B[sd + '_Hand']?.scale.setScalar(HAND_K);
   const bones = {}; for (const b of skel.bones) bones[b.name] = b;
   group.updateMatrixWorld(true);
 
@@ -114,9 +117,13 @@ export async function buildWorker(stage, app) {
   const P = geo.attributes.position, UV = geo.attributes.uv, N = geo.attributes.normal;
   const grpOf = new Int8Array(P.count); for (const gr of geo.groups) grpOf.fill(gr.materialIndex, gr.start, gr.start + gr.count);
   // ── camisa de verdade (malha da F01 presa ao esqueleto da F11); a casca branca da F11 recua por baixo dela ──
-  let shirtF01 = null;
-  try { const SM = await import('./worker_shirt.js'); shirtF01 = await SM.buildShirt({ fbx, bones, mgr, inject, NOISE }); }
+  // UNIFORME: camisa de brim marinho manga longa + calça (worker_uniform.js); reserva: camisa branca (worker_shirt.js)
+  let shirtF01 = null, uni = null;
+  try { const UM = await import('./worker_uniform.js'); uni = await UM.buildUniform({ fbx, bones, mgr, inject, NOISE }); shirtF01 = uni.mesh; }
+  catch (e) { uni = null; console.warn('[worker] uniforme indisponível, usando a camisa F01:', e); }
+  if (!shirtF01) try { const SM = await import('./worker_shirt.js'); shirtF01 = await SM.buildShirt({ fbx, bones, mgr, inject, NOISE }); }
   catch (e) { console.warn('[worker] camisa F01 indisponível, usando a procedural:', e); }
+  const uniPants = !!uni?.pants;
   // (malha do FBX em z-cima: modelo = (x, zRaw, −yRaw))
   const P0 = new Float32Array(P.array); // posições originais: base da casca do colete (não herda o volume da camisa)
   // amostra do atlas: pele do decote fica sem volume de tecido
@@ -131,6 +138,9 @@ export async function buildWorker(stage, app) {
     if (grpOf[i] !== 0) continue;
     const u = UV.getX(i), v = 1 - UV.getY(i), x = P.getX(i), y = P.getZ(i), z = -P.getY(i);
     const side = u < 0.335 || u > 0.665, hand = side && v < 0.235 && (u < 0.2 || u > 0.8);
+    if (uniPants && !side && y < 92) { const yy = 92 + (y - 92) * 0.12, k = 0.62;  // saia recolhida para dentro da calça
+      P.setXYZ(i, x * k, -((z + 1.5) * k - 1.5), yy); continue; }
+    if (uniPants && !hand && y < 92 && Math.abs(x) < 26) { push(i, y < 24 ? -1.6 : -1.2); continue; } // pernas/bota de salto sob calça e botina
     if (!side && y < 92) { const yy = 92 + (y - 92) * 0.3; const k = 0.97 + 0.05 * Math.max(0, (yy - 80) / 12); // fralda solta da camisa
       P.setXYZ(i, x * k, -((z + 1.5) * k - 1.5), yy); continue; }
     if (hand || y < 90 || y > 151) continue;
@@ -161,10 +171,10 @@ export async function buildWorker(stage, app) {
   const rep = new Set(head?.replaces || []);
 
   // ── materiais ──
-  const armU = { uE: { value: ELB }, uW: { value: WRI }, uTat: { value: tattooTex() } };
-  const bodyMat = inject(new THREE.MeshPhysicalMaterial({ map: recolorBody(bodyC), normalMap: new THREE.CanvasTexture(bodyN), normalScale: new THREE.Vector2(0.35, 0.35), roughnessMap: roughFromSpec(bodyS, 0.95),
+  const armU = { uE: { value: ELB }, uW: { value: WRI }, uTat: { value: tattooTex() }, uUni: { value: uni?.sleeves ? 1 : 0 } };
+  const bodyMat = inject(new THREE.MeshPhysicalMaterial({ map: recolorBody(bodyC, !!uni), normalMap: new THREE.CanvasTexture(bodyN), normalScale: new THREE.Vector2(0.35, 0.35), roughnessMap: roughFromSpec(bodyS, 0.95),
     roughness: 1, metalness: 0, sheen: 0.18, sheenColor: new THREE.Color(0xffffff), sheenRoughness: 0.8, specularIntensity: 0.4 }), {
-    decl: NOISE + '\nuniform vec3 uE, uW; uniform sampler2D uTat;',
+    decl: NOISE + '\nuniform vec3 uE, uW; uniform sampler2D uTat; uniform float uUni;',
     color: `vec3 pr = vec3(abs(vRest.x), vRest.y, vRest.z); vec3 ax = uW - uE; float s = dot(pr - uE, ax) / dot(ax, ax);
       vec3 rad = pr - (uE + ax * s); float dd = length(rad);
       float wShirt = 0.0;
@@ -176,7 +186,8 @@ export async function buildWorker(stage, app) {
           float ang = atan(dot(rad, sd), dot(rad, up));
           vec2 tu = vec2((s - 0.48) / 0.42, 0.5 + ang / 0.9);
           if (tu.y > 0.0 && tu.y < 1.0) sk *= 1.0 - 0.8 * texture2D(uTat, vec2(tu.x, tu.y)).a; }
-        diffuseColor.rgb = sk; }
+        diffuseColor.rgb = sk;
+        if (uUni > 0.5) { wSkin = 0.0; diffuseColor.rgb = vec3(0.016, 0.027, 0.055) * (0.9 + 0.15 * vn(vRest * 2.0)); } } // manga longa do uniforme por cima
       else if (dd < 11.0 && s >= 0.955 && s < 1.12) { wMask = 1.0; vec3 kq = vRest * 14.0; float kn = 0.5 + 0.5 * sin(kq.x + 2.0 * sin(kq.y)) * sin(kq.z + kq.y);
         diffuseColor.rgb = mix(vec3(0.012, 0.012, 0.014) * (0.7 + 0.6 * kn), vec3(0.75, 0.6, 0.02), smoothstep(0.955, 0.958, s) * (1.0 - smoothstep(0.966, 0.969, s))); }
       if (wSkin < 0.5 && wMask < 0.5 && dot(diffuseColor.rgb, vec3(0.333)) > 0.5) {   // crepe branco: microfranzido + leve variação
@@ -276,6 +287,10 @@ export async function buildWorker(stage, app) {
   }
   const relTo = (bone, cm) => { const bp = bone.getWorldPosition(V3()); const wp = V3(cm[0], cm[1], cm[2]).applyMatrix4(fbx.matrixWorld); return wp.sub(bp).applyQuaternion(gq.clone().invert()); };
 
+  // ── botina de segurança (substitui a bota de salto; malha rígida presa ao osso do pé) ──
+  if (uniPants) try { const BM = await import('./worker_boots.js'); BM.buildBoots({ bones, group, floorY: group.getWorldPosition(V3()).y }); }
+  catch (e) { console.warn('[worker] botina indisponível:', e); }
+
   // ── mangas dobradas: punho largo e fofo logo abaixo do cotovelo (dobras grandes e macias) ──
   const shirtM = inject(new THREE.MeshPhysicalMaterial({ color: 0xf1efea, roughness: 0.9, sheen: 0.35, sheenColor: new THREE.Color(0xffffff), sheenRoughness: 0.7, side: THREE.DoubleSide }), {
     decl: NOISE, color: 'diffuseColor.rgb *= 0.9 + 0.12 * vn(vRest * 2.5);',
@@ -351,12 +366,15 @@ export async function buildWorker(stage, app) {
     for (const e of [earL, earR]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.0065, 0.0075, 0.016, 12), plugM); p.rotation.z = Math.PI / 2; p.position.x = Math.sign(e.position.x || 1) * 0.004; e.add(p); }
   }
 
-  // ── âncoras do dosímetro (CONTRACT): centro do aparelho à frente da costura do ombro do colete ──
+  // ── âncoras do dosímetro (CONTRACT): preso pelo clipe na CAMISA (gola/vista, junto à clavícula), por dentro da abertura do
+  //    colete; corpo do aparelho deitado sobre o peito (inclina ~20° para trás, acompanhando o tórax), microfone para cima,
+  //    ponta do microfone a ~150–180 mm do canal auditivo do mesmo lado (zona auditiva NHO-01: 150 ± 50 mm) ──
   const chest = holderOn(B.Spine2);
-  const mk = (par, pos, ry = 0) => { const o = new THREE.Object3D(); o.position.copy(pos); o.rotation.y = ry; par.add(o); return o; };
+  const mk = (par, pos, ry = 0, rx = 0, rz = 0) => { const o = new THREE.Object3D(); o.position.copy(pos); o.rotation.set(rx, ry, rz, 'YXZ'); par.add(o); return o; };
+  const DOSI = { x: 6.0, y: 137.0, z: 7.7, ry: 0.2, rx: -0.3, rz: -0.16 }; // cm do modelo (repouso)
   const anchors = {
-    shoulderL: mk(chest, relTo(B.Spine2, [11.0, 142.5, 7.4]), 0.45),
-    shoulderR: mk(chest, relTo(B.Spine2, [-11.0, 142.5, 7.4]), -0.45),
+    shoulderL: mk(chest, relTo(B.Spine2, [DOSI.x, DOSI.y, DOSI.z]), DOSI.ry, DOSI.rx, DOSI.rz),
+    shoulderR: mk(chest, relTo(B.Spine2, [-DOSI.x, DOSI.y, DOSI.z]), -DOSI.ry, DOSI.rx, -DOSI.rz),
     earL: head?.anchors?.earL || earL, earR: head?.anchors?.earR || earR,
     head: head?.anchors?.head || mk(headH, hp(0, 160, -3)),
   };
@@ -493,7 +511,7 @@ export async function buildWorker(stage, app) {
     if (!S.keyInit) { S.key.copy(keyTarget); S.keyInit = true; }
     smV(S.key, keyTarget, 9, dt);
     const fdir = V3(0.5, 0.85, -0.08).normalize();
-    const wristUp = S.key.clone().sub(fdir.clone().multiplyScalar(0.165));
+    const wristUp = S.key.clone().sub(fdir.clone().multiplyScalar(0.165 * HAND_K));
     wristUp.y += Math.sin(t0 * 1.3) * 0.002;
     const sr = wpos(B.R_UpperArm), wristDown = sr.clone().add(W(-0.06, -0.5, 0.1));
     const wrist = wristDown.clone().lerp(wristUp, armW);
@@ -516,5 +534,9 @@ export async function buildWorker(stage, app) {
 
   return { group, anchors, update, setActivity(name) { activity = name; }, get phase() { return phase; },
     setPhase(p, hold = 99) { phase = p; phaseT = 0; phaseDur = hold; },
-    debug: () => { const m = anchors.shoulderL.localToWorld(V3(0, 0.09, 0)), e = anchors.earL.getWorldPosition(V3()); return { mic: m.toArray(), ear: e.toArray(), d: m.distanceTo(e) }; } };
+    debug: () => { // ponta do microfone (0,09 m acima do centro, +y local) × canal auditivo do mesmo lado (NHO-01: 100–200 mm)
+      const r = {}; for (const s of ['L', 'R']) { const a = anchors['shoulder' + s]; a.updateWorldMatrix(true, false);
+        const m = a.localToWorld(V3(0, 0.09, 0)), e = anchors['ear' + s].getWorldPosition(V3()), d = m.distanceTo(e);
+        r[s] = { mic: m.toArray().map((v) => +v.toFixed(4)), ear: e.toArray().map((v) => +v.toFixed(4)), mm: Math.round(d * 1000), zona: d >= 0.1 && d <= 0.2 }; }
+      return { mic: r.L.mic, ear: r.L.ear, d: r.L.mm / 1000, micEar_mm: r.L.mm, zonaAuditiva: r.L.zona, R: r.R }; } };
 }
