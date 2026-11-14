@@ -381,9 +381,24 @@ export async function buildWorker(stage, app) {
     aim(ua, fa, s.clone().add(dir.clone().multiplyScalar(along)).add(perp.multiplyScalar(h)));
     aim(fa, ha, s.clone().add(dir.multiplyScalar(d)));
   }
-  const fingerCurl = (side, f, ang, palmN) => { for (const k of ['', '1', '2']) { const b = B[side + '_Finger' + f + k]; if (!b) continue;
-    const c = B[side + '_Finger' + f + (k === '' ? '1' : '2')]; const fd = c && c !== b ? wpos(c).sub(wpos(b)).normalize() : null; if (!fd) continue;
-    rotW(b, fd.clone().cross(palmN).normalize(), ang); } };
+  // Dedos: dobra no eixo LOCAL de cada falange (biped do Rocketbox: o eixo de flexão é o mesmo em todas), evitando a
+  // "garra" que surgia com eixos calculados no mundo. Ângulos [proximal, média, distal] em rad.
+  const _fq = new URLSearchParams(location.search);
+  const F_AX = { x: V3(1, 0, 0), y: V3(0, 1, 0), z: V3(0, 0, 1) }[_fq.get('fax') || 'z'], F_SG = +(_fq.get('fsg') || 1);
+  const T_AX = { x: V3(1, 0, 0), y: V3(0, 1, 0), z: V3(0, 0, 1) }[_fq.get('tax') || 'z'], T_SG = +(_fq.get('tsg') || 1);
+  const _q = new THREE.Quaternion();
+  function finger(side, f, angs, axis = F_AX, sg = F_SG) {
+    ['', '1', '2'].forEach((k, i) => { const b = B[side + '_Finger' + f + k]; if (b && angs[i]) { b.quaternion.multiply(_q.setFromAxisAngle(axis, sg * angs[i])); } });
+  }
+  function handPose(side, point, k = 1) { // point: 1 = indicador apontando; 0 = mão relaxada
+    const P = (a, r) => a.map((x, i) => (x * point + r[i] * (1 - point)) * k);
+    finger(side, '1', P([0.12, 0.08, 0.05], [0.35, 0.45, 0.3]));        // indicador
+    finger(side, '2', P([1.35, 1.45, 0.85], [0.45, 0.55, 0.35]));       // médio
+    finger(side, '3', P([1.45, 1.5, 0.85], [0.5, 0.6, 0.35]));          // anelar
+    finger(side, '4', P([1.5, 1.45, 0.8], [0.55, 0.6, 0.35]));          // mínimo
+    finger(side, '0', P([0.35, 0.55, 0.35], [0.15, 0.25, 0.15]), T_AX, T_SG); // polegar recolhido sobre o médio
+    B[side + '_Hand']?.updateMatrixWorld(true);
+  }
   const headFwdLocal = V3(0, 0, 1).applyQuaternion(gq).applyQuaternion(B.Head.getWorldQuaternion(new THREE.Quaternion()).invert());
   const lidRest = ['LEyeBlinkTop', 'REyeBlinkTop'].map((n) => B[n]).filter(Boolean);
 
@@ -484,10 +499,11 @@ export async function buildWorker(stage, app) {
     const wrist = wristDown.clone().lerp(wristUp, armW);
     if (armW > 0.02) wrist.y += Math.sin(Math.PI * armW) * 0.05;            // arco natural ao subir/descer
     ik('R', wrist, W(-0.55, -0.8, 0.15).lerp(W(-0.15, -0.2, -1), 1 - armW).normalize());
+    if (armW <= 0.35) handPose('R', 0);
+    handPose('L', 0);
     if (armW > 0.35) {
       aim(B.R_Hand, B.R_Finger1, S.key, Math.min(1, (armW - 0.35) / 0.4));
-      const palmN = wpos(B.R_Finger4).sub(wpos(B.R_Finger1)).cross(wpos(B.R_Finger2).sub(wpos(B.R_Hand))).normalize();
-      for (const f of ['2', '3', '4']) fingerCurl('R', f, 1.15 * Math.min(1, armW * 1.4), palmN);
+      handPose('R', Math.min(1, (armW - 0.35) / 0.4));
     }
     // piscar (desce as pálpebras superiores ~6 mm por 0,12 s)
     blinkT -= dt; if (blinkT < 0) { blink = 0.14; blinkT = 2.5 + Math.random() * 3.5; }
