@@ -115,6 +115,7 @@ export function buildHair({ THREE, add, recs, skin, hw, zB, zF, T, ear, rimY, R,
     if (i < 0 || i >= body.nx || j < 0 || j >= body.ny) return -1; const v = body.z[j * body.nx + i]; return v === 1e9 ? -1 : v; };
 
   // ── guias da cascata ──
+  const HAIR_K = +(new URLSearchParams(location.search).get('hlen') || 0.6); // comprimento (1 = abaixo das escápulas; 0,6 = altura dos ombros)
   const NG = 190;
   for (let gI = 0; gI < NG; gI++) {
     const side = R() < 0.5 ? -1 : 1, spread = Math.pow(R(), 0.8);
@@ -124,7 +125,7 @@ export function buildHair({ THREE, add, recs, skin, hw, zB, zF, T, ear, rimY, R,
     let p = onSkull(a, y, 0.006);
     const out = V3(Math.sin(a), 0, Math.cos(a));
     let d = out.clone().multiplyScalar(0.55 + R() * 0.3).add(V3(0, -0.85, 0)).normalize();
-    const Lg = 0.12 + R() * 0.13 + (1 - spread) * 0.05, step = 0.012, pts = [p.clone()];
+    const Lg = (0.12 + R() * 0.13 + (1 - spread) * 0.05) * HAIR_K, step = 0.012, pts = [p.clone()];
     for (let s = 0; s * step < Lg; s++) {
       d.add(V3(0, -0.11, 0)).add(out.clone().multiplyScalar(p.y > -0.12 ? 0.1 : -0.01)).add(V3(side < 0 && p.y > -0.2 ? -0.05 : 0, 0, 0)).add(V3((R() - 0.5) * 0.06, 0, (R() - 0.5) * 0.06)).normalize();
       p = p.clone().addScaledVector(d, step);
