@@ -11,16 +11,61 @@ const st = (app) => app.fw?.state || {};
 const isOn = (app) => (st(app).power || 'on') === 'on';
 const mode = (app) => st(app).mode;
 
-// âncora para acoplar o calibrador no microfone (boca do acoplador encaixa na ponta do microfone, calibrador de cabeça para baixo)
+// ── acoplamento calibrador ↔ microfone (dono: ACOPLAMENTO) ──
+// O microfone ½" (sem espuma) entra na cavidade do acoplador até o anel de borracha encostar no colar; o calibrador fica
+// COAXIAL ao microfone, com a boca do acoplador voltada para a ponta do microfone e a FRENTE (visor/CalPro) para a câmera.
+// A geometria vem do modelo em tempo de execução: posição de `cavity` no referencial do calibrador (eixo da boca =
+// eixo dominante centro→cavidade). Eixo do microfone = +y do Object3D `mic` do dosímetro.
+const MIC_INSERT = 0.0078;   // m de cápsula dentro do acoplador (cápsula 8 mm acima do colar; o anel para no colar)
+const RING_SQUEEZE = 0.0007; // m de compressão do anel de borracha no encaixe
+const PRE_H = 0.04, SLOW_H = 0.02;  // aproximação alinhada ao eixo: para a 4 cm, desce rápido até 2 cm e devagar no fim
+const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _m = new THREE.Matrix4();
+function cavityInGroup(c) {
+  const g = c.group, cav = c.cavity;
+  if (!cav) return new THREE.Vector3(0, 0.0526, 0);
+  g.updateWorldMatrix(true, true); cav.updateWorldMatrix(true, false);
+  _m.copy(g.matrixWorld).invert().multiply(cav.matrixWorld);
+  const p = new THREE.Vector3(); _m.decompose(p, _q, _s); return p;
+}
 function couplingAnchor(app) {
-  const d = app.dosimeter, c = app.calibrator; if (!d?.mic || !c) return null;
+  const d = app.dosimeter, c = app.calibrator; if (!d?.mic || !c?.group) return null;
   let a = app.anchors.calCouple;
   if (!a) { a = new THREE.Object3D(); a.name = 'calCouple'; d.mic.add(a); app.anchors.calCouple = a; }
-  const cy = c.cavity ? c.cavity.position.y : 0.05;
-  a.position.set(0, cy - 0.008, 0); a.rotation.set(Math.PI, 0, 0); // 8 mm de encaixe do microfone dentro do acoplador
+  const cp = cavityInGroup(c);
+  const ax = [Math.abs(cp.x), Math.abs(cp.y), Math.abs(cp.z)], i = ax.indexOf(Math.max(...ax));
+  const u = new THREE.Vector3(); u.setComponent(i, Math.sign(cp.getComponent(i)) || 1);          // boca do acoplador (ref. calibrador)
+  const f = new THREE.Vector3(0, 0, 1); if (Math.abs(u.z) > 0.9) f.set(0, 1, 0);
+  f.addScaledVector(u, -f.dot(u)).normalize();                                                      // frente ⟂ eixo
+  const S = new THREE.Matrix4().makeBasis(f, u, new THREE.Vector3().crossVectors(f, u));
+  const T = new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, -1, 0), new THREE.Vector3(1, 0, 0));
+  a.quaternion.setFromRotationMatrix(T.multiply(S.transpose()));                                    // boca → −y do mic, frente → +z (câmera)
+  a.position.set(0, -MIC_INSERT, 0).sub(cp.clone().applyQuaternion(a.quaternion));                  // boca a MIC_INSERT abaixo da ponta
   return a;
 }
-
+const easeIO = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+const easeOut = (t) => 1 - (1 - t) ** 3;
+/** Pose de mundo do calibrador acoplado, deslocado `h` m ao longo do eixo do microfone (h > 0 = afastado). */
+function couplePose(app, a, h) {
+  return (p, q) => { const mic = app.dosimeter.mic; mic.updateWorldMatrix(true, false);
+    p.copy(a.position); p.y += h; mic.localToWorld(p); mic.getWorldQuaternion(q).multiply(a.quaternion); };
+}
+const anchorPose = (o) => (p, q) => { o.updateWorldMatrix(true, false); o.matrixWorld.decompose(p, q, _s); };
+/** Tween de pose de mundo (alvo recalculado a cada quadro; o objeto fica filho da cena durante o movimento). */
+function tweenPose(app, obj, pose, dur, { ease = easeIO, arc = 0 } = {}) {
+  return new Promise((res) => {
+    const s = app.stage; if (!obj || !s) return res();
+    obj.updateWorldMatrix(true, true); s.scene.attach(obj);
+    const p0 = obj.position.clone(), q0 = obj.quaternion.clone(), p1 = new THREE.Vector3(), q1 = new THREE.Quaternion();
+    let t = 0;
+    const off = s.onFrame((dt) => {
+      pose(p1, q1); t = Math.min(1, t + dt / dur); const e = ease(t);
+      obj.position.lerpVectors(p0, p1, e); if (arc) obj.position.y += Math.sin(Math.PI * e) * arc;
+      obj.quaternion.slerpQuaternions(q0, q1, e);
+      if (t >= 1) { off?.(); res(); }
+    });
+  });
+}
+const settle = (parent, obj) => { parent.attach(obj); obj.position.set(0, 0, 0); obj.quaternion.identity(); };
 
 // ── navegação real pelo menu do firmware (mesmas teclas do manual: ▶❙❙ sobe/aumenta, ■ desce/diminui, ☰ confirma) ──
 const NAV_MS = 620;
@@ -90,35 +135,12 @@ export const fwDo = {
     while (performance.now() - t0 < 24000 && !['run', 'gravando', 'recording'].includes(mode(app))) await wait(250);
     if (!['run', 'gravando', 'recording'].includes(mode(app))) fw.quickStart?.();
   },
-  async stopWithPostCal(app) {
-    const fw = app.fw; if (!fw) return;
-    // NHO-01 6.4.1 g: interromper a medição ANTES de retirar o microfone do trabalhador
-    if (st(app).locked) await press(app, 'power+menu', 3100, 800);       // desbloqueia o teclado (⏻+☰ 3 s)
-    if (['run', 'pause'].includes(mode(app))) await press(app, 'stop', 3100, 900); // ■ 3 s → "Pos Calibrar"
-    app.setView('present', { animate: true, duration: 1.8 });
-    await app.present(app.dosimeter.group, 'presentDevice', 1.6); app.state.mounted = false; app.emit('change');
-    app.dosimeter.setWindscreen?.(false); await wait(700);
-    await fwDo.couple(app, true);
-    if (st(app).popup?.type === 'postcal') {
-      while (st(app).popup && st(app).popup.sel !== 2) await press(app, 'stop', 0, 300); // desce até 114dB
-      await press(app, 'menu', 0, 500);
-      await new Promise((res) => { let done = false; const off = fw.on?.('postcal', () => { done = true; res(); }); setTimeout(() => { if (!done) res(); off?.(); }, 9000); });
-    }
-    await wait(800);
-    await fwDo.couple(app, false);
-    app.dosimeter.setWindscreen?.(true);
+  stopWithPostCal(app) { // reentrante: fim da jornada (UI) e botão podem chamar juntos → uma só pós-calibração
+    if (!postCalP) postCalP = postCalRun(app).finally(() => { postCalP = null; });
+    return postCalP;
   },
-  async couple(app, on) {
-    const c = app.calibrator; if (!c) return;
-    if (on) {
-      c.setLevel?.(114); c.setOn?.(true); await wait(500);
-      const a = couplingAnchor(app); if (a) await app.present(c.group, 'calCouple', 1.3);
-      app.coupleCalibrator(true); app.audio?.tone?.(true, 114);
-    } else {
-      app.audio?.tone?.(false); app.coupleCalibrator(false);
-      if (c.home) await flyHome(app, c);
-      c.setOn?.(false);
-    }
+  async couple(app, on) { // serializa: um acoplamento/desacoplamento termina antes do próximo começar
+    const job = coupleQ.then(() => coupleRun(app, on)); coupleQ = job.catch(() => {}); return job;
   },
   async ensureReady(app) {
     await fwDo.powerOn(app);
@@ -126,7 +148,55 @@ export const fwDo = {
     app.dosimeter?.setWindscreen?.(true);
   },
 };
-async function flyHome(app, c) { app.anchors._calHome = c.home; await app.present(c.group, '_calHome', 1.1); }
+
+let postCalP = null, coupleQ = Promise.resolve();
+async function postCalRun(app) {
+  const fw = app.fw; if (!fw) return;
+  // NHO-01 6.4.1 g: interromper a medição ANTES de retirar o microfone do trabalhador
+  if (st(app).locked) await press(app, 'power+menu', 3100, 800);       // desbloqueia o teclado (⏻+☰ 3 s)
+  if (['run', 'pause'].includes(mode(app))) await press(app, 'stop', 3100, 900); // ■ 3 s → "Pos Calibrar"
+  app.setView('calib', { animate: true, duration: 1.8 });            // dosímetro + calibrador inteiros e em foco
+  await app.present(app.dosimeter.group, 'presentDevice', 1.6); app.state.mounted = false; app.emit('change');
+  app.dosimeter.setWindscreen?.(false); await wait(700);
+  await fwDo.couple(app, true);
+  if (st(app).popup?.type === 'postcal') {
+    for (let g = 0; g < 6 && st(app).popup && st(app).popup.sel !== 2; g++) await press(app, 'stop', 0, 300); // desce até 114dB
+    await press(app, 'menu', 0, 500);
+    await new Promise((res) => { let done = false; const off = fw.on?.('postcal', () => { done = true; res(); }); setTimeout(() => { if (!done) res(); off?.(); }, 9000); });
+  }
+  await wait(800);
+  await fwDo.couple(app, false);
+  app.dosimeter.setWindscreen?.(true);
+}
+async function coupleRun(app, on) {
+  const c = app.calibrator, d = app.dosimeter; if (!c?.group || !d?.mic) return;
+  const a = couplingAnchor(app);
+  if (on) {
+    if (app.state.calibratorCoupled && c.group.parent === a) return;
+    d.setWindscreen?.(false);                                    // acoplar só com o microfone sem espuma
+    // 1) tira da maleta e mostra ao lado do aparelho, de frente; liga em 114 dB ANTES de acoplar
+    const show = app.anchors.presentCalibrator;
+    if (show) { await tweenPose(app, c.group, anchorPose(show), 1.3, { arc: 0.06 }); settle(show, c.group); }
+    c.setLevel?.(114); c.setOn?.(true); await wait(1500);       // visor: "CalPro" → "114dB"
+    // 2) gira coaxial ao microfone (boca para baixo, frente para a câmera) e para 4 cm acima da ponta
+    await tweenPose(app, c.group, couplePose(app, a, PRE_H), 1.1, { arc: 0.006 });
+    // 3) desce alinhado ao eixo; os últimos 2 cm devagar; o anel comprime e acomoda
+    await tweenPose(app, c.group, couplePose(app, a, SLOW_H), 0.45, { ease: (t) => t * (2 - t) });
+    await tweenPose(app, c.group, couplePose(app, a, -RING_SQUEEZE), 1.25, { ease: easeOut });
+    await tweenPose(app, c.group, couplePose(app, a, 0), 0.3, { ease: easeIO });
+    settle(a, c.group);
+    app.coupleCalibrator(true); app.audio?.tone?.(true, c.level?.() ?? 114); // tom de 1 kHz só enquanto acoplado
+  } else {
+    if (!app.state.calibratorCoupled && c.group.parent !== a) { c.setOn?.(false); return; }
+    app.audio?.tone?.(false); app.coupleCalibrator(false);
+    // desacoplamento inverso: solta o anel, sobe 2 cm devagar ao longo do eixo, afasta, desliga e volta à maleta
+    await tweenPose(app, c.group, couplePose(app, a, -RING_SQUEEZE * 0.5), 0.2, { ease: easeIO });
+    await tweenPose(app, c.group, couplePose(app, a, SLOW_H), 0.9, { ease: (t) => t * t });
+    await tweenPose(app, c.group, couplePose(app, a, PRE_H), 0.4, { ease: easeOut });
+    c.setOn?.(false);
+    if (c.home) { await tweenPose(app, c.group, anchorPose(c.home), 1.4, { arc: 0.07 }); settle(c.home, c.group); }
+  }
+}
 
 export const MOUNT_TEXT = `Antes de instalar, a trabalhadora é informada: <ul><li>do objetivo da avaliação;</li><li>que deve manter a rotina normal de trabalho;</li><li>que o aparelho não grava conversas;</li><li>que só o avaliador pode retirar o equipamento;</li><li>que o microfone não pode ser tocado nem obstruído.</li></ul>O dosímetro é preso pelo clipe na vestimenta, sobre o ombro do lado mais exposto (o lado da prensa), com o microfone dentro da zona auditiva: raio de 150 ± 50 mm a partir da entrada do canal auditivo.`;
 
@@ -198,13 +268,16 @@ export const STEPS = [
     run: async (app, ctx) => { await menuGo(app, ctx, 'sobre'); await wait(2600); if (ctx.alive()) await press(app, 'menu', 0, 600); await menuExit(app); } },
   { chapter: 'cal', title: 'Calibração: retirar a espuma', highlight: null,
     text: 'Antes de cada medição o dosímetro deve ser calibrado com o calibrador acústico, de acordo com as instruções do fabricante. Primeiro retiramos a espuma do microfone.',
-    run: async (app) => { app.dosimeter?.setWindscreen?.(false); } },
+    run: async (app) => { const d = app.dosimeter; app.setView('calib', { animate: true, duration: 1.6 });
+      if (d?.group && d.group.parent !== app.anchors.presentDevice) { await app.present(d.group, 'presentDevice', 1.4); app.state.mounted = false; app.emit('change'); }
+      d?.setWindscreen?.(false); } },
   { chapter: 'cal', title: 'Acoplar o calibrador', highlight: null,
     text: 'O calibrador é ligado no nível de 114 decibéis a 1 quilohertz e encaixado no microfone, sem folga. O sinal de referência agora chega ao microfone.',
-    run: async (app) => { await fwDo.couple(app, true); } },
+    run: async (app) => { if (app.stage?.view !== 'calib') app.setView('calib', { animate: true, duration: 1.2 }); await fwDo.couple(app, true); } },
   { chapter: 'cal', title: 'Calibrar', highlight: 'menu',
     text: 'No menu Dosimetria, opção Calibrar, selecionamos o mesmo nível aplicado pelo calibrador, 114 dB, e confirmamos. O aparelho ajusta a sensibilidade até ler 114,0 dB.',
-    run: async (app) => { await fwDo.calibrate(app, 114); } },
+    run: async (app) => { if (app.stage?.view !== 'calib') app.setView('calib', { animate: true, duration: 1.2 });
+      if (!app.state.calibratorCoupled) await fwDo.couple(app, true); await fwDo.powerOn(app); await fwDo.calibrate(app, 114); } },
   { chapter: 'cal', title: 'Calibração concluída', highlight: null,
     text: 'Retiramos o calibrador e recolocamos a espuma. Ao final da jornada a calibração será aferida de novo: se a diferença passar de mais ou menos 1 dB, a NHO-01 manda invalidar a medição e repetir.',
     run: async (app) => { await fwDo.couple(app, false); app.dosimeter?.setWindscreen?.(true); } },

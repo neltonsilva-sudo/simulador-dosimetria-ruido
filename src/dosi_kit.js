@@ -31,8 +31,8 @@ export function buildKitImpl(stage) {
   // espuma superior com recortes
   const top = roundRectArc(W - 2 * wall - 1, D - 2 * wall - 1, 21);
   const P = (pts, dx, dy) => mirroredShape(pts.map(([x, y]) => [x, y]), THREE.Path);
-  const dosiHalf = samplePath([[[0, -61], [16, -61]], [[16, -61], [26, -61], [32.5, -50], [32.5, -38]], [[32.5, -38], [32.5, 40]],
-    [[32.5, 40], [32.5, 49], [27, 51], [18, 51]], [[18, 51], [16.5, 64], [12, 72], [0, 72]]], 10).map(([x, y]) => [x, y]);
+  const dosiHalf = samplePath([[[0, -73], [17, -73]], [[17, -73], [24, -73], [31, -66], [31.5, -50]], [[31.5, -50], [33, -10], [33, 40]],
+    [[33, 40], [33, 53], [29, 58.5], [19, 58.5]], [[19, 58.5], [17.5, 72], [13, 86], [0, 86]]], 10).map(([x, y]) => [x, y]);
   const off = (pts, dx, dy) => pts.map(([x, y]) => [x + dx, y + dy]);
   // shape y = −z da maleta; dosímetro com microfone para o fundo (−z) → +y da forma
   const dPath = new THREE.Path(); { const pts = dosiHalf, n = pts.length; const all = pts.concat(pts.slice(1, n - 1).reverse().map(([x, y]) => [-x, y]));

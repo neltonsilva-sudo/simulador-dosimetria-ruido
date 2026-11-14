@@ -1,0 +1,45 @@
+<!doctype html><html><body style="margin:0;background:#3a3a3a;color:#ddd;font:12px system-ui">
+<div id="g" style="display:grid;grid-template-columns:repeat(8,1fr);gap:6px;padding:6px"></div>
+<script type="module">
+// Comparação lado a lado: visor simulado × foto do manual (shots/fwref). ?only=nome  ?w=largura
+import { createFirmware } from './firmware.js';
+const q = new URLSearchParams(location.search);
+const base = (fw, s) => { fw.setClock(16 * 3600 + 3 * 60); s.power = 'on'; s.date = { d: 11, m: 12 }; s.history.length = 0; for (let i = 0; i < 100; i++) s.history.push(84 + 3 * Math.sin(i / 9) + 1.5 * Math.sin(i * 1.3) + (i > 18 ? 3 : 0)); };
+const run = (fw, s, extra) => { fw.quickStart(); for (let i = 0; i < 3 * 3600; i++) fw.feed(85 + 3 * Math.sin(i / 900), 1, 13 * 3600 + i); base(fw, s); };
+const page = (fw, s, name) => { fw.press('menu', 3000); s.menuPath = ['main', 'dosimetria']; s.menuSel.dosimetria = { duracao: 0, registros: 3, apagar: 4, calibrar: 5 }[name]; fw.press('menu'); };
+const CASES = [
+  ['nivel', (fw, s) => { base(fw, s); s.screen = 0; }],
+  ['espectro', (fw, s) => { base(fw, s); s.screen = 1; }],
+  ['oitavas', (fw, s) => { base(fw, s); s.screen = 2; }],
+  ['nho01', (fw, s) => { run(fw, s); s.screen = 3; }],
+  ['nr15', (fw, s) => { run(fw, s); s.screen = 4; }],
+  ['user', (fw, s) => { run(fw, s); s.screen = 5; }],
+  ['pausa', (fw, s) => { run(fw, s); fw.press('play', 3000); s.screen = 0; }],
+  ['rec', (fw, s) => { run(fw, s); s.locked = true; s.screen = 0; }],
+  ['precal', (fw, s) => { base(fw, s); s.popup = { type: 'precal', sel: 0 }; }],
+  ['poscal', (fw, s) => { base(fw, s); s.popup = { type: 'postcal', sel: 0 }; }],
+  ['menu1', (fw, s) => { base(fw, s); s.menuPath = ['main']; s.menuSel.main = 0; }],
+  ['menu2', (fw, s) => { base(fw, s); s.menuPath = ['main']; s.menuSel.main = 1; }],
+  ['dosimetria', (fw, s) => { base(fw, s); s.menuPath = ['main', 'dosimetria']; s.menuSel.dosimetria = 0; }],
+  ['duracao', (fw, s) => { base(fw, s); page(fw, s, 'duracao'); }],
+  ['registros', (fw, s) => { base(fw, s); page(fw, s, 'registros'); }],
+  ['apagar', (fw, s) => { base(fw, s); page(fw, s, 'apagar'); }],
+  ['calibracao', (fw, s) => { base(fw, s); page(fw, s, 'calibrar'); }],
+  ['sobre', (fw, s) => { base(fw, s); s.menuPath = ['main']; s.menuSel.main = 3; fw.press('menu'); }],
+  ['boot', (fw, s) => { fw.press('power', 3000); fw.update(1.2); }],
+];
+const only = q.get('only'); const g = document.getElementById('g');
+if (only) g.style.gridTemplateColumns = 'repeat(2,1fr)';
+if (q.get('solo')) { g.style.cssText = 'display:block;padding:0'; document.body.style.fontSize = '0'; }
+const inp = { L: 85.1, spectrum: [62, 66, 70, 76, 76, 74, 70, 60], calibrator: { coupled: false, on: false, level: 114 }, calDrift: 0.2 };
+for (const [name, fn] of CASES) {
+  if (only && !only.split(',').includes(name)) continue;
+  const fw = createFirmware({ getInput: () => inp }); const s = fw.state;
+  try { fn(fw, s); s.splShown = 85.1; s.spectrumShown ||= [58, 64, 66, 68, 70, 74, 82, 66]; fw.update(0.05); s.rev++; fw.update(0.1); } catch (e) { console.error(name, e); }
+  for (const el of q.get('solo') ? [fw.canvas] : [fw.canvas, Object.assign(new Image(), { src: `../shots/fwref/${name}.png` })]) {
+    const d = document.createElement('div'); el.style.cssText = 'width:100%;aspect-ratio:4/5;object-fit:fill;display:block;background:#000';
+    d.appendChild(el); d.append(name); g.appendChild(d);
+  }
+}
+window.__ready = true;
+</script></body></html>

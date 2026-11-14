@@ -11,14 +11,17 @@ export const CAMS = {
   // close-up do ombro ESQUERDO (lado da prensa = lado mais exposto) para mostrar o dosímetro instalado
   // (enquadra aparelho + orelha/capacete; foco entre microfone e orelha, fundo desfocado)
   shoulder: { pos: [0.48, 1.5, -0.8], target: [0.02, 1.39, -0.1], fov: 32, focus: [0.04, 1.4, -0.11], dof: 0.5 },
+  // calibração (dono: ACOPLAMENTO): dosímetro em PRESENT.device + calibrador acoplado no microfone (aparelhos inteiros,
+  // visores legíveis), com espaço à direita para o calibrador ser mostrado ligado antes do encaixe; foco no conjunto
+  calib: { pos: [2.43, 1.372, 2.63], target: [2.376, 1.352, 2.05], fov: 30, focus: [2.37, 1.34, 2.062], dof: 0.5 },
 };
 // Bancada/carrinho do técnico com a maleta do kit (dosímetro + calibrador). Tampo a TABLE.h do piso.
 export const TABLE = { pos: [2.35, 0, 1.75], rotY: -0.5, h: 0.9 };
 // Pose de apresentação: o aparelho flutua à frente da câmera (vitrine de produto), fundo desfocado.
 export const PRESENT = {
-  cam: { pos: [2.35, 1.45, 2.65], target: [2.35, 1.30, 1.95], fov: 30, focus: [2.35, 1.30, 2.05], dof: 1 },
+  cam: { pos: [2.35, 1.36, 2.56], target: [2.35, 1.287, 2.05], fov: 30, focus: [2.35, 1.31, 2.062], dof: 0.55 },
   device: { pos: [2.35, 1.30, 2.05], rotY: 0 },   // tela voltada para a câmera (+z)
-  calibrator: { pos: [2.62, 1.22, 2.0], rotY: -0.25 },
+  calibrator: { pos: [2.448, 1.288, 2.062], rotY: -0.06 }, // ligado e mostrado ao lado do aparelho, antes de acoplar (dono: ACOPLAMENTO)
 };
 
 // Geometria do galpão (CENÁRIO). Dois vãos com tesouras, pilares a cada BAY m ao longo de z.

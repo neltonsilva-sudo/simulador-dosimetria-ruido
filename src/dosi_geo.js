@@ -112,3 +112,19 @@ export function iconShapes(kind, s = 1) {
   }
   return out;
 }
+
+/** pinta cores de vértice: fn(x,y,z,nx,ny,nz) → [r,g,b] multiplicadores (1 = sem mudança) */
+export function paintVerts(geo, fn) {
+  const P = geo.attributes.position, N = geo.attributes.normal, c = new Float32Array(P.count * 3);
+  for (let i = 0; i < P.count; i++) { const v = fn(P.getX(i), P.getY(i), P.getZ(i), N.getX(i), N.getY(i), N.getZ(i)); c[i * 3] = v[0]; c[i * 3 + 1] = v[1]; c[i * 3 + 2] = v[2]; }
+  geo.setAttribute('color', new THREE.BufferAttribute(c, 3)); return geo;
+}
+/** desloca uma meia-silhueta (x≥0, de baixo x=0 ao topo x=0) para fora por d mm (normal da polilinha) */
+export function offsetHalf(half, d) {
+  return half.map(([x, y], i) => {
+    const a = half[Math.max(0, i - 1)], b = half[Math.min(half.length - 1, i + 1)];
+    let tx = b[0] - a[0], ty = b[1] - a[1]; const l = Math.hypot(tx, ty) || 1; tx /= l; ty /= l;
+    const nx = ty, ny = -tx; // percorre no sentido anti-horário (direita sobe) → normal externa = (ty, −tx)
+    return [i === 0 || i === half.length - 1 ? 0 : x + nx * d, y + ny * d];
+  });
+}
