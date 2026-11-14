@@ -1,6 +1,7 @@
 // Geometria do corpo do calibrador CalPro (mm, y para cima, frente +z). Corpo de borracha "sabonete": seção retangular
 // arredondada que AFINA para baixo, ombros arredondados no alto, base estreita e arredondada, bolsão frontal em U.
 import * as THREE from 'three';
+import { cleanShape } from './dosi_geo.js';
 
 export const BODY = { yTop: 50, yBot: -50, hd: 19, r: 10.5, rtx: 10, rty: 9, rtz: 9.5, rb: 6, bore: 7.0, crown: 3.4 };
 // meia-largura (silhueta frontal medida na foto de frente; 0,2857 mm/px)
@@ -109,6 +110,7 @@ export function windowShape(W) {
 }
 /** extrusão com bisel suave e UV planar (u,v ∈ 0..1 no retângulo dado) */
 export function extrudePlanar(shape, depth, bevel, rect, curve = 24) {
+  if (bevel > 0) shape = cleanShape(shape, curve);   // sem ponto de fechamento duplicado (evita rasgo no chanfro)
   const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 4, curveSegments: curve });
   const p = g.attributes.position, uv = g.attributes.uv;
   for (let i = 0; i < p.count; i++) uv.setXY(i, (p.getX(i) - rect[0]) / (rect[2] - rect[0]), (p.getY(i) - rect[1]) / (rect[3] - rect[1]));

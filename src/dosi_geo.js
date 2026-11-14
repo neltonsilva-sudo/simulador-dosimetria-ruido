@@ -42,8 +42,17 @@ export function samplePath(segs, per = 14) {
  * Extrusão com bisel de quarto de círculo e normais suaves (mergeVertices), centrada em z.
  * uv: 'box' (projeção por eixo dominante em mm × uvScale) | 'planar' (xy normalizado no bbox → decalques/serigrafia)
  */
+/** Remove pontos repetidos (inclusive o de fechamento igual ao inicial): com chanfro, um segmento de comprimento zero
+ *  gera um vetor de chanfro inválido e "rasga" a peça no ponto onde o contorno começa/termina. */
+export function cleanShape(shape, curve = 24) {
+  const { shape: pts, holes } = shape.extractPoints(curve);
+  const dedup = (a) => { const o = []; for (const q of a) if (!o.length || o[o.length - 1].distanceTo(q) > 1e-5) o.push(q);
+    while (o.length > 2 && o[0].distanceTo(o[o.length - 1]) < 1e-5) o.pop(); return o; };
+  const s = new THREE.Shape(dedup(pts)); s.holes = holes.map((hh) => new THREE.Path(dedup(hh))); return s;
+}
 export function extrudeSmooth(shape, T, { bt = 1, bs = 1, seg = 6, curve = 24, uv = 'box', uvScale = 1, crease = false } = {}) {
   const depth = Math.max(0.0001, T - 2 * bt);
+  shape = cleanShape(shape, curve);
   let g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: bt, bevelSize: bs, bevelOffset: -bs, bevelSegments: seg, curveSegments: curve });
   g.translate(0, 0, -depth / 2);
   g.deleteAttribute('uv'); g.deleteAttribute('normal');
