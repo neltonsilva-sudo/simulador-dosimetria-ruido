@@ -204,6 +204,12 @@ async function coupleRun(app, on) {
 
 export const MOUNT_TEXT = `Antes de instalar, a trabalhadora é informada: <ul><li>do objetivo da avaliação;</li><li>que deve manter a rotina normal de trabalho;</li><li>que o aparelho não grava conversas;</li><li>que só o avaliador pode retirar o equipamento;</li><li>que o microfone não pode ser tocado nem obstruído.</li></ul>O dosímetro é preso pelo clipe na vestimenta, sobre o ombro do lado mais exposto (o lado da prensa), com o microfone dentro da zona auditiva: raio de 150 ± 50 mm a partir da entrada do canal auditivo.`;
 
+// Legendas narradas fora dos passos (fim da demonstração, início e encerramento da dosimetria) — voz gerada por tools/gen_tts.py
+export const CAPTIONS = {
+  pronto: { title: 'Demonstração concluída', text: 'O dosímetro está ligado, configurado e calibrado. Agora ele será instalado na trabalhadora: sobre o ombro, preso na vestimenta, com o microfone dentro da zona auditiva.' },
+  iniciar: { title: 'Iniciando a dosimetria', text: 'Para iniciar, segure a tecla iniciar e pausar por 3 segundos. Na pergunta "Pré calibrar", selecionamos "Não", porque o aparelho acabou de ser calibrado. O indicador vermelho pisca por 20 segundos e a gravação começa sozinha. Depois de 60 segundos o teclado se bloqueia, para que a medição não seja alterada.' },
+  poscal: { title: 'Encerrar e pós-calibrar', text: 'Ao fim da jornada, segure a tecla parar por 3 segundos e escolha "Pós calibrar". Retiramos o dosímetro do trabalhador, removemos a espuma e acoplamos de novo o calibrador, em 114 decibéis. O aparelho compara a leitura com a calibração inicial: pela NHO-01, se a diferença passar de 1 decibel, para mais ou para menos, a medição é invalidada e deve ser repetida.' },
+};
 export const CHAPTERS = [
   { id: 'tudo', label: 'Demonstração completa', sub: 'Usar, configurar e calibrar' },
   { id: 'uso', label: '1. Como usar', sub: 'Partes, ligar, telas, iniciar/pausar/parar, bloqueio' },

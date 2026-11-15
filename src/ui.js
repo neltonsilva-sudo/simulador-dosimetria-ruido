@@ -1,6 +1,6 @@
 // Interface + demonstração narrada — dono: UI/DEMO.
 // Fluxo: explorar → Dosímetro (apresentação: operar + calibrar) → colocar na trabalhadora → iniciar dosimetria → parar + pós-cal → relatório.
-import { STEPS, CHAPTERS, MOUNT_TEXT, fwDo, demoClock } from './demo.js';
+import { STEPS, CHAPTERS, MOUNT_TEXT, CAPTIONS, fwDo, demoClock } from './demo.js';
 import { createDoseLesson } from './ui_dose.js';
 
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -162,7 +162,7 @@ export function createUI(root, app) {
         btn(voiceOn ? '🗣 Voz' : '🔈 Voz off', 'ghost', () => { voiceOn = !voiceOn; if (!voiceOn) stopVoice(); render(); }),
         btn('Pular demonstração ⏭', 'ghost', () => finishPresentation())]);
     } else if (p === 'pronto') {
-      showCaption('Demonstração concluída', 'O dosímetro está ligado, configurado e calibrado. Agora ele será instalado na trabalhadora: sobre o ombro, preso na vestimenta, com o microfone dentro da zona auditiva.', `${steps.length}/${steps.length}`);
+      showCaption(CAPTIONS.pronto.title, CAPTIONS.pronto.text, `${steps.length}/${steps.length}`);
       setBar([soundBtn(), btn('🎓 Demonstração', 'ghost', openDemoChooser), btn('<span class="ic">⤴</span> Colocar o dosímetro na trabalhadora', 'primary big', mount)]);
     } else if (p === 'colocado') {
       setBar([soundBtn(), viewBtns(), btn('↩ Retirar', 'ghost', async () => { await app.unmountDosimeter(); app.setPhase('pronto'); }), btn('<span class="ic">▶</span> Iniciar dosimetria', 'primary big', start)]);
@@ -227,7 +227,7 @@ export function createUI(root, app) {
     token++; stopVoice(); demoClock.paused = false;
     app.dosimeter?.highlight?.(null);
     await fwDo.ensureReady(app); // ligado + calibrado + espuma no lugar, calibrador guardado
-    app.setPhase('pronto');
+    app.setPhase('pronto'); say(CAPTIONS.pronto.text);
   }
   async function mount() {
     showCaption('Instalação no trabalhador (NHO-01, item 6.3)', MOUNT_TEXT, '');
@@ -240,15 +240,15 @@ export function createUI(root, app) {
   }
   async function start() {
     app.audio?.start?.();
-    showCaption('Iniciando a dosimetria', 'Tecla ▶❙❙ por 3 segundos → "Pré calibrar": como o aparelho acabou de ser calibrado, selecionamos "Não". O indicador vermelho pisca por 20 segundos e a gravação começa sozinha. O teclado se bloqueia após 60 s.', '');
+    showCaption(CAPTIONS.iniciar.title, CAPTIONS.iniciar.text, ''); const fala = say(CAPTIONS.iniciar.text);
     S.clock = app.workday.start - 25; // 06:59:35
     await fwDo.startRecording(app);
     app.startDosimetry(); app.setView('ref', { animate: true, duration: 2.5 });
-    setTimeout(() => cap.classList.add('hidden'), 6000);
+    fala.then(() => setTimeout(() => { if (S.phase === 'dosimetria') cap.classList.add('hidden'); }, 1500)); // legenda some quando a narração termina
   }
   async function stopAndReport() {
     app.pauseDosimetry();
-    showCaption('Encerrar e pós-calibrar', 'Tecla ■ por 3 s → "Pós calibrar". O aparelho é retirado do trabalhador, a espuma é removida e o calibrador é acoplado de novo. Pela NHO-01, se a aferição variar mais de ±1 dB em relação à calibração inicial, a medição é invalidada.', '');
+    showCaption(CAPTIONS.poscal.title, CAPTIONS.poscal.text, ''); say(CAPTIONS.poscal.text);
     await fwDo.stopWithPostCal(app);
     app.setPhase('relatorio'); showReport();
   }
