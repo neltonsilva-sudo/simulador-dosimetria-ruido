@@ -195,3 +195,7 @@
 .ui-slmlcd .sl-keys span.pw { color:#9fd0ff; font-size:13px; }
 .ui-slmlcd .sl-keys span.on { background:linear-gradient(#3b8be0,#1d5fae); color:#fff; box-shadow:0 0 0 2px rgba(120,190,255,.6), 0 0 14px rgba(80,160,255,.55); transform:translateY(1px); }
 @media (max-width: 760px) { .ui-slmlcd { transform:scale(.62); transform-origin:top left; left:8px; top:8px; } }
+/* aula da Dose — títulos e fórmulas em amarelo (pedido do usuário) */
+.ui-dose h3 { color:#ffd54f; }
+.ui-dose .eq, .ui-dose .eq b { color:#ffd54f; }
+.ui-dose .eq small { color:#c9b46a; }
