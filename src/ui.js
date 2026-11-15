@@ -11,7 +11,7 @@ export function createUI(root, app) {
   const S = app.state;
   root.innerHTML = '';
   // ── cabeçalho ──
-  const top = h('div', 'ui-top glass', `<div class="ui-brand"><b>Dosimetria de Ruído</b><span>Gêmeo digital · NHO-01 · NR-15 Anexo 1</span></div>`);
+  const top = h('div', 'ui-top glass', `<div class="ui-brand"><b>Dosimetria de Ruído</b><span>Simulador · NHO-01 · NR-15 Anexo 1</span></div>`);
   const live = h('div', 'ui-live glass', '');
   root.append(top, live);
   // ── visor ampliado ──
