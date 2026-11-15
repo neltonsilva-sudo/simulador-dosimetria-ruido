@@ -10,6 +10,7 @@ import { CAMS, TABLE, PRESENT } from './layout_cams.js';
 const qs = new URLSearchParams(location.search);
 const canvas = document.getElementById('c');
 const boot = document.getElementById('boot');
+const bootStep = (pct, txt) => { const b = document.getElementById('bootbar'), t = document.getElementById('bootst'); if (b) b.style.width = pct + '%'; if (t && txt) t.textContent = txt; };
 const listeners = {};
 const V = (a) => new THREE.Vector3(...a);
 
@@ -125,24 +126,32 @@ function stepSimulation(dt) {
 
 // ─── boot ───
 (async () => {
+  bootStep(8, 'Preparando a cena…');
   const sceneMod = await load('./scene.js');
-  if (!sceneMod) { boot.textContent = 'ERRO AO CARREGAR A CENA'; return; }
+  if (!sceneMod) { bootStep(100, 'Erro ao carregar a cena'); return; }
   const stage = (app.stage = await sceneMod.createStage(canvas, { quality: qs.get('q') || 'high', app }));
   window.__stage = stage;
 
   const [hallM, machM, workM, dosiM, calM, fwM, audM, uiM] = await Promise.all(
     ['./hall.js', './machines.js', './worker.js', './dosimeter.js', './calibrator.js', './firmware.js', './audio.js', './ui.js'].map(load));
 
+  bootStep(28, 'Montando o galpão…');
   app.hall = await safe('hall', () => hallM?.buildHall(stage, app));
+  bootStep(42, 'Instalando as prensas…');
   app.machines = await safe('machines', () => machM?.buildMachines(stage, app));
+  bootStep(52, 'Ligando o dosímetro…');
   app.fw = await safe('firmware', () => fwM?.createFirmware({ app, getInput }));
   app.dosimeter = await safe('dosimeter', () => dosiM?.buildDosimeter(stage, app.fw, app));
+  bootStep(60, 'Preparando o calibrador…');
   app.calibrator = await safe('calibrator', () => calM?.buildCalibrator(stage, app));
   app.kit = await safe('kit', () => dosiM?.buildKit?.(stage, app));
+  bootStep(68, 'Chamando a trabalhadora…');
   app.worker = await safe('worker', () => workM?.buildWorker(stage, app));
+  bootStep(84, 'Ajustando o som…');
   app.audio = await safe('audio', () => audM?.createAudio(stage, app));
   // módulos extras de realismo (opcionais): colegas ao fundo e detalhes do ambiente
   const [crewM, propsM] = await Promise.all(['./crew.js', './props.js'].map(load));
+  bootStep(90, 'Detalhes do ambiente…');
   app.crew = await safe('crew', () => crewM?.buildCrew?.(stage, app));
   app.props = await safe('props', () => propsM?.buildProps?.(stage, app));
 
@@ -158,6 +167,7 @@ function stepSimulation(dt) {
     app.dosimeter?.update?.(dt, t); app.calibrator?.update?.(dt, t); app.hall?.update?.(dt, t); app.audio?.update?.(dt, t); app.crew?.update?.(dt, t); app.props?.update?.(dt, t);
   });
 
+  bootStep(97, 'Quase pronto…');
   app.ui = await safe('ui', () => uiM?.createUI(document.getElementById('ui'), app));
   stage.setView(qs.get('cam') || 'ref');
   // atalhos para capturas/testes: ?mount=1 (já instalado), ?run=1 (dosimetria rodando), ?t=HH:MM (avança o relógio)
@@ -166,7 +176,10 @@ function stepSimulation(dt) {
   if (qs.get('t')) { const [h, m] = qs.get('t').split(':').map(Number); const target = h * 3600 + (m || 0) * 60;
     if (state.running) { const sp = state.speed; state.speed = 1; while (state.clock < target - 1 && state.running) { simAcc = 0; stepSimulation(Math.max(1, Math.min(600, Math.ceil(target - state.clock)))); } state.speed = sp; } else state.clock = target; }
   if (qs.get('ui') === '0') document.getElementById('ui').style.display = 'none';
-  boot.style.opacity = 0; setTimeout(() => boot.remove(), 700);
+  bootStep(100, 'Pronto');
+  // espera 2 quadros já desenhados (shaders compilados) antes de revelar a cena
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 250))));
+  boot.style.opacity = 0; boot.style.pointerEvents = 'none'; setTimeout(() => boot.remove(), 700);
   app.emit('ready'); app.emit('change');
 })();
 
