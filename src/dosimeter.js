@@ -275,7 +275,9 @@ export function buildDosimeter(stage, fw, app) {
     }, { capture: true });
     const up = (e) => {
       const h = held.get(e.pointerId); if (!h) return; held.delete(e.pointerId);
-      if (!h.fired) { const ms = performance.now() - h.t0; if (h.key === 'power+menu' && holding('power+menu')) { /* espera a outra */ } else fire(h.key, ms); }
+      if (!h.fired) { const ms = performance.now() - h.t0; if (h.key === 'power+menu' && holding('power+menu')) { /* espera a outra */ } else fire(h.key, ms);
+        // toque rápido na ⏻ com o aparelho desligado: avisa que é pressão longa (como no aparelho real)
+        if (h.key === 'power' && ms < 2500 && fw?.state?.power === 'off') app?.emit?.('toast', 'Para ligar, segure a tecla ⏻ por 3 segundos (o anel enche).'); }
       for (const o of held.values()) if (o.key === 'power+menu' && h.key === 'power+menu') o.fired = true;
       if (!held.size && stage.controls) stage.controls.enabled = true;
     };

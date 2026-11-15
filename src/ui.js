@@ -131,6 +131,9 @@ export function createUI(root, app) {
 
   const dose = createDoseLesson({ root, app, h, say: (t) => say(t), stopVoice: () => stopVoice(), pauseVoice: () => pauseVoice(), resumeVoice: () => resumeVoice() });
   const doseBtn = (cls = 'big') => btn('📐 Dose', cls, () => dose.open(0));
+  // avisos rápidos vindos da cena (ex.: toque curto na ⏻ do dosímetro desligado)
+  const toastEl = h('div', 'ativ-toast info hidden', ''); root.appendChild(toastEl); let toastTm = 0;
+  app.on('toast', (msg) => { toastEl.textContent = msg; toastEl.classList.remove('hidden'); clearTimeout(toastTm); toastTm = setTimeout(() => toastEl.classList.add('hidden'), 3500); });
   const ativ = createActivities({ root, app, h, say: (t) => say(t), stopVoice: () => stopVoice(), dose, fwDo });
   const ativBtn = (cls = 'big') => btn('📝 Atividade', cls, () => ativ.open());
   function btn(label, cls, fn) { const b = h('button', 'ui-btn ' + (cls || ''), label); b.onclick = fn; return b; }

@@ -283,3 +283,4 @@
 
 /* títulos dos passos da demonstração em amarelo */
 .ui-cap-h b { color:#ffd54f; }
+.ativ-toast.info { background:rgba(36,110,220,.95); }
