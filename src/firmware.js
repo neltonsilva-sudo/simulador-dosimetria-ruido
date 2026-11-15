@@ -10,7 +10,9 @@ export function createFirmware({ app, getInput } = {}) {
   let drawnRev = -1, sinceDraw = 1, prevPower = core.state.power, offT = null; // offT: transição de desligar (s)
   const OFF_S = 0.9;
   const fw = {
-    canvas: lcd.canvas, nativeCanvas: lcd.native, backlight: () => lcd.backlight, dirty: true, state: core.state, core,
+    canvas: lcd.canvas, nativeCanvas: lcd.native,
+    /** visor em alta resolução (vetorial) para o painel da interface: ctx 2D, px do ctx por pixel nativo */
+    drawHi: (ctx, scale) => lcd.drawVector(ctx, scale, core.state, core, offT !== null ? { off: offT / OFF_S } : {}), backlight: () => lcd.backlight, dirty: true, state: core.state, core,
     press: (key, holdMs = 0) => { const was = core.state.power; core.press(key, holdMs); if (was !== 'off' && core.state.power === 'off') { offT = 0; prevPower = 'off'; } redraw(true); },
     update(dt) {
       core.update(dt); sinceDraw += dt || 0;

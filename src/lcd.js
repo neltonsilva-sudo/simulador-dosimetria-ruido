@@ -8,7 +8,11 @@ const NW = 128, NH = 160, K = 4, W = NW * K, H = NH * K;
 const rgb = (r, g, b) => ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
 const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 const P = (c) => (typeof c === 'number' || typeof c === 'function' ? c : rgb(c[0] | 0, c[1] | 0, c[2] | 0));
-const vgrad = (y0, y1, a, b) => (x, y) => { const t = Math.max(0, Math.min(1, (y - y0) / (y1 - y0))); const c = mix(a, b, t); return rgb(c[0] | 0, c[1] | 0, c[2] | 0); };
+const vgrad = (y0, y1, a, b) => { const f = (x, y) => { const t = Math.max(0, Math.min(1, (y - y0) / (y1 - y0))); const c = mix(a, b, t); return rgb(c[0] | 0, c[1] | 0, c[2] | 0); }; f.g = [y0, y1, a, b]; return f; };
+const css = (c) => (typeof c === 'number' ? `rgb(${c & 255},${(c >> 8) & 255},${(c >> 16) & 255})` : `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`);
+// fontes do modo vetorial (painel em alta resolução): [peso, família, altura das maiúsculas em px nativos]
+const FAM = { mono: '"Roboto Mono", Menlo, Consolas, monospace', cond: '"Roboto Condensed", "Arial Narrow", Arial, sans-serif' };
+const VF = { S: ['500', 'mono', 7], SB: ['700', 'mono', 7], M: ['600', 'cond', 11.5], MB: ['700', 'cond', 11.5], B: ['700', 'cond', 12], L: ['700', 'cond', 24] };
 const hash = (n) => { const s = Math.sin(n * 12.9898 + 4.1) * 43758.5453; return s - Math.floor(s); };
 
 // paleta medida nas fotos (TFT, gama já "queimada")
@@ -38,10 +42,35 @@ export function createLCD() {
   vign.addColorStop(0, '#ffffff'); vign.addColorStop(0.7, '#f2f4f6'); vign.addColorStop(1, '#b8bcc4');
   const bleed = ctx.createLinearGradient(0, H, 0, H - 70); bleed.addColorStop(0, 'rgba(70,90,120,0.16)'); bleed.addColorStop(1, 'rgba(70,90,120,0)');
 
+  // ── modo vetorial: as mesmas telas desenhadas num Canvas2D em escala VS (texto com fonte real, linhas suaves) ──
+  let V = null, VS = 1, OY = 0; // OY: deslocamento vertical já aplicado ao contexto (degradês)
+  const tex = document.createElement('canvas'), tx = tex.getContext('2d');
+  function vfill(c) {
+    if (typeof c !== 'function') return css(c);
+    if (!c.g) return null;
+    const [y0, y1, a, b] = c.g; if (a === b || (a[0] === b[0] && a[1] === b[1] && a[2] === b[2])) return css(a);
+    const g = V.createLinearGradient(0, y0 * VS - OY, 0, y1 * VS - OY); g.addColorStop(0, css(a)); g.addColorStop(1, css(b)); return g;
+  }
+  /** cor por pixel (função) amostrada numa textura w×h e ampliada com filtro bilinear; clip opcional (path no contexto) */
+  function vtex(x, y, w, h, f, clip) {
+    w = Math.ceil(w); h = Math.ceil(h); tex.width = w; tex.height = h; const id = tx.createImageData(w, h), b32 = new Uint32Array(id.data.buffer);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) b32[j * w + i] = f(x + i, y + j);
+    tx.putImageData(id, 0, 0); V.save(); if (clip) { clip(); V.clip(); }
+    V.imageSmoothingEnabled = true; V.imageSmoothingQuality = 'high'; V.drawImage(tex, x * VS, y * VS, w * VS, h * VS); V.restore();
+  }
+  function rrPath(x, y, w, h, r, inset = 0) { V.beginPath(); V.roundRect(x * VS + inset, y * VS + inset, w * VS - 2 * inset, h * VS - 2 * inset, Math.max(0, r * VS - inset)); }
+  function clear(c) { if (V) { V.fillStyle = css(c); V.fillRect(0, 0, NW * VS, NH * VS); } else buf.fill(c); }
+
   // ── primitivas no buffer nativo ──
-  function put(x, y, c) { x |= 0; y |= 0; if (x < 0 || y < 0 || x >= NW || y >= NH) return; buf[y * NW + x] = typeof c === 'function' ? c(x, y) : c; }
-  function rect(x, y, w, h, c) { c = P(c); for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) put(i, j, c); }
+  function put(x, y, c) { if (V) { V.fillStyle = vfill(c) ?? css(c(x, y)); V.fillRect((x | 0) * VS, (y | 0) * VS, VS, VS); return; } x |= 0; y |= 0; if (x < 0 || y < 0 || x >= NW || y >= NH) return; buf[y * NW + x] = typeof c === 'function' ? c(x, y) : c; }
+  function rect(x, y, w, h, c) { if (V) { if (w <= 0 || h <= 0) return; const st = vfill(c); if (st) { V.fillStyle = st; V.fillRect(x * VS, y * VS, w * VS, h * VS); } else vtex(x, y, w, h, c); return; } c = P(c); for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) put(i, j, c); }
   function rbox(x, y, w, h, fill, border, r = h >= 14 && w >= 14 ? 2 : 1) { // retângulo com cantos arredondados de 1–2 px
+    if (V) {
+      const R = r + 0.6, lw = Math.max(1, 0.8 * VS);
+      if (fill) { rrPath(x, y, w, h, R); const st = vfill(fill); if (st) { V.fillStyle = st; V.fill(); } else vtex(x, y, w, h, fill, () => rrPath(x, y, w, h, R)); }
+      if (border) { rrPath(x, y, w, h, R, lw / 2); V.strokeStyle = css(border); V.lineWidth = lw; V.stroke(); }
+      return;
+    }
     fill = fill && P(fill); border = border && P(border);
     for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
       const dx = Math.min(i, w - 1 - i), dy = Math.min(j, h - 1 - j);
@@ -51,16 +80,18 @@ export function createLCD() {
     }
   }
   function line(x0, y0, x1, y1, c) {
+    if (V) { V.strokeStyle = css(c); V.lineWidth = 1.25 * VS; V.lineCap = 'round'; V.beginPath(); V.moveTo((x0 + 0.5) * VS, (y0 + 0.5) * VS); V.lineTo((x1 + 0.5) * VS, (y1 + 0.5) * VS); V.stroke(); return; }
     x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1); c = P(c);
     const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let e = dx + dy;
     for (;;) { put(x0, y0, c); if (x0 === x1 && y0 === y1) break; const e2 = 2 * e; if (e2 >= dy) { e += dy; x0 += sx; } if (e2 <= dx) { e += dx; y0 += sy; } }
   }
-  function dots(x0, x1, y, c) { c = P(c); for (let x = x0; x <= x1; x += 2) put(x, y, c); }
-  function disc(cx, cy, r, f) { for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) { const d = Math.hypot(x + 0.5 - 0.5, y); if (d <= r - 0.3) put(cx + x, cy + y, f(x, y, d / r)); } }
+  function dots(x0, x1, y, c) { if (V) { V.save(); V.strokeStyle = css(c); V.globalAlpha = 0.85; V.lineWidth = 0.7 * VS; V.lineCap = 'round'; V.setLineDash([0, 2 * VS]); V.beginPath(); V.moveTo((x0 + 0.5) * VS, (y + 0.5) * VS); V.lineTo((x1 + 0.5) * VS, (y + 0.5) * VS); V.stroke(); V.restore(); return; } c = P(c); for (let x = x0; x <= x1; x += 2) put(x, y, c); }
+  function disc(cx, cy, r, f) { if (V) { vtex(cx - r, cy - r, 2 * r + 1, 2 * r + 1, (X, Y) => { const x = X - cx, y = Y - cy; return f(x, y, Math.min(1, Math.hypot(x, y) / r)); }, () => { V.beginPath(); V.arc((cx + 0.5) * VS, (cy + 0.5) * VS, (r - 0.2) * VS, 0, Math.PI * 2); }); return; } for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) { const d = Math.hypot(x + 0.5 - 0.5, y); if (d <= r - 0.3) put(cx + x, cy + y, f(x, y, d / r)); } }
   function measure(str, f = 'S', pitch) { const F = FONTS[f]; let w = 0, last = 0; for (const ch of str) { const g = F[ch] || F[' '] || F['0']; w += pitch ?? g.a; last = (pitch ?? g.a) - g.w; } return w - last; }
   /** texto bitmap; (x,y) = canto superior esquerdo da célula (ou centro/direita com align); rot=-90 → vertical (de baixo p/ cima a partir de y). */
   function text(str, x, y, f, col, { align = 'left', pitch, rot = 0 } = {}) {
     str = String(str); const F = FONTS[f]; const c = P(col); const w = measure(str, f, pitch);
+    if (V) { vtext(str, x, y, f, c, align, rot, w); return w; }
     let pen = align === 'center' ? Math.round(x - w / 2) : align === 'right' ? x - w : x;
     if (rot) pen = 0;
     for (const ch of str) {
@@ -72,7 +103,23 @@ export function createLCD() {
     }
     return w;
   }
+  /** texto com fonte real, ajustado à largura do texto bitmap (w) para manter o layout medido nas fotos */
+  function vtext(str, x, y, f, c, align, rot, w) {
+    const [wt, fam, cap] = VF[f] || VF.S; let size = cap / 0.711, sx = 1;
+    const font = () => `${wt} ${(size * VS).toFixed(2)}px ${FAM[fam]}`;
+    V.font = font(); let wv = V.measureText(str).width / VS; const lim = w + (cap <= 7 ? 1.2 : 2);
+    if (wv > lim) { const k = Math.max(0.84, lim / wv); size *= k; V.font = font(); wv *= k; if (wv > lim) sx = lim / wv; }
+    V.save();
+    if (rot) { V.translate(x * VS, y * VS); V.rotate(-Math.PI / 2); V.translate(0, cap * VS); OY = 0; V.textAlign = 'left'; }
+    else { const ax = align === 'center' ? Math.round(x - w / 2) + w / 2 : x; V.translate(ax * VS, (y + cap) * VS); OY = (y + cap) * VS; V.textAlign = align; }
+    V.scale(sx, 1); V.textBaseline = 'alphabetic'; V.fillStyle = vfill(c) ?? css(c(x, y)); V.fillText(str, 0, 0); V.restore(); OY = 0;
+  }
   function streaky(x, y, w, h, base = [150, 214, 238], hi = [246, 255, 255], border = [232, 250, 255], dark = [70, 140, 196]) { // fundo azul-claro com estrias verticais
+    if (V) {
+      vtex(x, y, w, h, (X, Y) => { const i = X - x, j = Y - y, s = hash(i * 1.7 + 3) * 0.55 + hash(i * 0.31) * 0.35, v = j / (h - 1), shade = Math.min(1, Math.min(v, 1 - v) * h / 3.2);
+        let c = mix(base, hi, s * 0.9); c = mix(dark, c, 0.55 + 0.45 * shade); return rgb(c[0] | 0, c[1] | 0, c[2] | 0); }, () => rrPath(x, y, w, h, 2.4));
+      if (border) rbox(x, y, w, h, null, border, 2); return;
+    }
     for (let i = 0; i < w; i++) {
       const s = hash(i * 1.7 + 3) * 0.55 + hash(i * 0.31) * 0.35;
       for (let j = 0; j < h; j++) {
@@ -88,17 +135,22 @@ export function createLCD() {
 
   // ── ícones ──
   function battery(pct) {
+    if (V) { const lw = 0.8 * VS; V.fillStyle = css(C.green); V.fillRect(116 * VS, 2.6 * VS, 3 * VS, 1.4 * VS);
+      rrPath(114, 4, 7, 9.2, 1.4, lw / 2); V.strokeStyle = css(C.green); V.lineWidth = lw; V.stroke();
+      const fh = 7.2 * Math.max(0.05, pct / 100); V.fillStyle = vfill(vgrad(4, 12, [96, 240, 128], [24, 180, 70])); rrPath(115.4, 11.8 - fh, 4.2, fh, 0.6); V.fill(); return; }
     const g = vgrad(4, 12, [96, 240, 128], [24, 180, 70]);
     rect(116, 3, 3, 1, C.green); rbox(114, 4, 7, 9, null, C.green);
     const fh = Math.max(1, Math.round(7 * pct / 100)); rect(115, 12 - fh, 5, fh, g);
   }
   function lock(x, y) { // cadeado 7×8
+    if (V) { V.strokeStyle = V.fillStyle = css(C.white); V.lineWidth = 1.1 * VS; V.beginPath(); V.arc((x + 3.5) * VS, (y + 3) * VS, 2.2 * VS, Math.PI, 0); V.lineTo((x + 5.7) * VS, (y + 4) * VS); V.moveTo((x + 1.3) * VS, (y + 3) * VS); V.lineTo((x + 1.3) * VS, (y + 4) * VS); V.stroke();
+      rrPath(x, y + 3.4, 7, 4.8, 0.9); V.fill(); V.fillStyle = css(C.bg); V.beginPath(); V.arc((x + 3.5) * VS, (y + 5.4) * VS, 0.8 * VS, 0, Math.PI * 2); V.fill(); return; }
     const c = P(C.white); rect(x + 1, y, 5, 1, c); rect(x, y + 1, 1, 3, c); rect(x + 6, y + 1, 1, 3, c);
     rect(x, y + 3, 7, 5, c); put(x + 3, y + 5, C.bg); put(x + 3, y + 6, C.bg);
   }
-  function headphone(x, y) { const c = P(C.red); rect(x + 2, y, 5, 1, c); put(x + 1, y + 1, c); put(x + 7, y + 1, c); rect(x, y + 2, 1, 3, c); rect(x + 8, y + 2, 1, 3, c); rect(x, y + 4, 3, 4, c); rect(x + 6, y + 4, 3, 4, c); }
-  function arrow(x, y, up, col) { const c = P(col); for (let j = 0; j < 5; j++) { const yy = up ? y + j : y + 4 - j; rect(x + 4 - j, yy, 2 * j + 1, 1, c); } }
-  function clockIcon(x, y) { const c = P(C.white); rect(x + 2, y, 3, 1, c); rect(x + 2, y + 6, 3, 1, c); rect(x, y + 2, 1, 3, c); rect(x + 6, y + 2, 1, 3, c); put(x + 1, y + 1, c); put(x + 5, y + 1, c); put(x + 1, y + 5, c); put(x + 5, y + 5, c); rect(x + 3, y + 1, 1, 3, c); put(x + 4, y + 3, c); }
+  function headphone(x, y) { if (V) { V.strokeStyle = V.fillStyle = css(C.red); V.lineWidth = 1.1 * VS; V.beginPath(); V.arc((x + 4.5) * VS, (y + 4.6) * VS, 3.9 * VS, Math.PI, 0); V.stroke(); rrPath(x, y + 4, 3, 4.2, 0.8); V.fill(); rrPath(x + 6, y + 4, 3, 4.2, 0.8); V.fill(); return; } const c = P(C.red); rect(x + 2, y, 5, 1, c); put(x + 1, y + 1, c); put(x + 7, y + 1, c); rect(x, y + 2, 1, 3, c); rect(x + 8, y + 2, 1, 3, c); rect(x, y + 4, 3, 4, c); rect(x + 6, y + 4, 3, 4, c); }
+  function arrow(x, y, up, col) { if (V) { V.fillStyle = css(col); V.beginPath(); if (up) { V.moveTo((x + 4.5) * VS, y * VS); V.lineTo((x + 9.2) * VS, (y + 5) * VS); V.lineTo((x - 0.2) * VS, (y + 5) * VS); } else { V.moveTo((x - 0.2) * VS, y * VS); V.lineTo((x + 9.2) * VS, y * VS); V.lineTo((x + 4.5) * VS, (y + 5) * VS); } V.closePath(); V.fill(); return; } const c = P(col); for (let j = 0; j < 5; j++) { const yy = up ? y + j : y + 4 - j; rect(x + 4 - j, yy, 2 * j + 1, 1, c); } }
+  function clockIcon(x, y) { if (V) { V.strokeStyle = css(C.white); V.lineWidth = 0.9 * VS; V.lineCap = 'round'; V.beginPath(); V.arc((x + 3.5) * VS, (y + 3.5) * VS, 3.1 * VS, 0, Math.PI * 2); V.moveTo((x + 3.5) * VS, (y + 1.6) * VS); V.lineTo((x + 3.5) * VS, (y + 3.5) * VS); V.lineTo((x + 4.9) * VS, (y + 3.9) * VS); V.stroke(); return; } const c = P(C.white); rect(x + 2, y, 3, 1, c); rect(x + 2, y + 6, 3, 1, c); rect(x, y + 2, 1, 3, c); rect(x + 6, y + 2, 1, 3, c); put(x + 1, y + 1, c); put(x + 5, y + 1, c); put(x + 1, y + 5, c); put(x + 5, y + 5, c); rect(x + 3, y + 1, 1, 3, c); put(x + 4, y + 3, c); }
   function triangle(x, y, up, col) { arrow(x, y, up, col); }
 
   // ── telas ──
@@ -308,15 +360,15 @@ export function createLCD() {
     ctx.globalCompositeOperation = 'source-over'; ctx.imageSmoothingEnabled = false;
   }
 
-  /** fx: {boot: s (tempo desde que ligou), off: 0..1 (transição de desligar)} */
-  function draw(s, core, fx = {}) {
-    buf.fill(C.bg);
-    if (fx.off != null) { bootScreen(); return compose(fx.off < 0.45 ? 1 : Math.max(0, 1 - (fx.off - 0.45) / 0.55)); }
-    if (s.power === 'off' || s.displayOff) return compose(0);
+  /** fx: {boot: s (tempo desde que ligou), off: 0..1 (transição de desligar)} → retorna a retroiluminação 0..1 */
+  function paint(s, core, fx = {}) {
+    clear(C.bg);
+    if (fx.off != null) { bootScreen(); return fx.off < 0.45 ? 1 : Math.max(0, 1 - (fx.off - 0.45) / 0.55); }
+    if (s.power === 'off' || s.displayOff) return 0;
     if (s.power === 'boot') {
       const t = s.bootT;
-      if (t < 0.18) { buf.fill(rgb(236, 242, 248)); return compose(t / 0.18 * 0.6); } // inicialização do controlador TFT (tela branca)
-      bootScreen(); return compose(Math.min(1, 0.6 + (t - 0.18) * 1.6));
+      if (t < 0.18) { clear(rgb(236, 242, 248)); return t / 0.18 * 0.6; } // inicialização do controlador TFT (tela branca)
+      bootScreen(); return Math.min(1, 0.6 + (t - 0.18) * 1.6);
     }
     if (s.menuPath.length) {
       const top = s.menuPath[s.menuPath.length - 1];
@@ -333,7 +385,17 @@ export function createLCD() {
     }
     if (s.msg) msgBox(s.msg.text);
     const b = s.settings.brightness;
-    compose(b >= 10 ? 1 : 0.35 + 0.065 * b);
+    return b >= 10 ? 1 : 0.35 + 0.065 * b;
   }
-  return { canvas, draw, native: nc, get backlight() { return lastBl; } };
+  function draw(s, core, fx = {}) { compose(paint(s, core, fx)); }
+  /** mesma tela em alta resolução (vetorial) num contexto 2D qualquer: escala = px do contexto por pixel nativo */
+  function drawVector(c2d, scale, s, core, fx = {}) {
+    V = c2d; VS = scale; OY = 0; c2d.save(); c2d.setTransform(1, 0, 0, 1, 0, 0); c2d.globalAlpha = 1; c2d.globalCompositeOperation = 'source-over';
+    try {
+      const bl = paint(s, core, fx);
+      if (bl <= 0.001) { c2d.fillStyle = '#030405'; c2d.fillRect(0, 0, NW * VS, NH * VS); }
+      else if (bl < 0.999) { c2d.fillStyle = `rgba(3,4,5,${(1 - bl).toFixed(3)})`; c2d.fillRect(0, 0, NW * VS, NH * VS); }
+    } finally { c2d.restore(); V = null; }
+  }
+  return { canvas, draw, drawVector, native: nc, get backlight() { return lastBl; } };
 }

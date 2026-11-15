@@ -21,8 +21,10 @@ export function createUI(root, app) {
   if (narrow()) lcdWrap.classList.add('collapsed');
   lcdWrap.querySelector('.ui-cap-toggle').onclick = () => { lcdUser = true; lcdWrap.classList.toggle('collapsed'); };
   // painel do visor em resolução nativa da tela (pixels de 128×160 ampliados por inteiro: 2× por px CSS × devicePixelRatio)
-  const LDPR = Math.min(3, Math.max(1, Math.round(window.devicePixelRatio || 1))), LS = 2 * LDPR;
-  const lcd = h('canvas'); lcd.width = 128 * LS; lcd.height = 160 * LS; lcdWrap.appendChild(lcd);
+  const LDPR = Math.min(3, Math.max(1, window.devicePixelRatio || 1)), LS = 2 * LDPR;
+  const lcd = h('canvas'); lcd.width = Math.round(128 * LS); lcd.height = Math.round(160 * LS); lcdWrap.appendChild(lcd);
+  // fontes do visor vetorial (Google Fonts no index.html); o canvas só as usa depois de carregadas
+  try { for (const f of ['500 20px "Roboto Mono"', '700 20px "Roboto Mono"', '600 20px "Roboto Condensed"', '700 20px "Roboto Condensed"']) document.fonts?.load(f); } catch {}
   const keys = h('div', 'ui-keys');
   // Teclas do aparelho: toque curto ao soltar; pressão longa dispara sozinha aos 3 s com o dedo ainda no botão (como no DoseMax).
   const LONG = 3000;
@@ -268,6 +270,7 @@ export function createUI(root, app) {
   function drawPanelLCD() {
     const fw = app.fw, nc = fw?.nativeCanvas, W = lcd.width, H = lcd.height;
     if (!nc) { lctx.imageSmoothingEnabled = true; lctx.drawImage(fw.canvas, 0, 0, W, H); return; }
+    if (fw.drawHi) { fw.drawHi(lctx, W / 128); return; } // vetorial: fonte real, linhas suaves, nítido em qualquer DPR
     const bl = fw.backlight ? fw.backlight() : 1;
     lctx.globalAlpha = 1; lctx.imageSmoothingEnabled = false; lctx.fillStyle = '#030405'; lctx.fillRect(0, 0, W, H);
     if (bl <= 0.001) return;
