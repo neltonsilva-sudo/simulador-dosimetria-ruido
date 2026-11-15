@@ -64,6 +64,24 @@ const RANGES_LO_HI = (r) => String(r || '30–130').split('–').map(Number);
 const ORIENT = {
   a1i: { text: 'Atividade avaliativa com o decibelímetro. Realize as etapas de 1 a 5. Ao terminar, clique em Entregar.' },
   a2i: { text: 'Atividade avaliativa com o dosímetro. Realize as etapas de 1 a 6. Ao terminar, clique em Entregar.' },
+  // modo com orientação passo a passo (treino)
+  g1i: { text: 'Atividade prática com o decibelímetro. Você vai avaliar a exposição de um operador que trabalha em três postos durante a jornada. Cumpra as cinco etapas: configurar o medidor, calibrar, medir o ruído das três máquinas, calcular a dose, o NE e o NEN pela NHO-01 e dar o parecer técnico. Cada etapa vale pontos. Quando terminar, clique em Entregar para ver a sua nota.' },
+  a1: [
+    { text: 'Etapa 1, configurar. O decibelímetro veio configurado para outro uso. Use as teclas do visor, no canto esquerdo, para deixá-lo pronto para avaliar a exposição ocupacional a ruído contínuo: escolha o circuito de ponderação na tecla A barra C, a resposta na tecla F barra S, desligue a retenção do máximo e ajuste a faixa de medição na tecla LEVEL, para que o valor não fique fora da escala.' },
+    { text: 'Etapa 2, calibrar. Antes de medir, verifique o medidor com o calibrador acústico. Retire a espuma do microfone, acople o calibrador e ligue-o em 94 ou 114 decibéis. Ligue o modo CAL e use os botões mais e menos até o visor indicar o mesmo valor do calibrador. Depois desligue o CAL, desacople o calibrador e recoloque a espuma.' },
+    { text: 'Etapa 3, medir. Leve o decibelímetro a cada um dos três postos. Com o microfone na zona auditiva, espere a leitura estabilizar, leia o valor no visor do aparelho e registre. Faça isso nas três máquinas.' },
+    { text: 'Etapa 4, calcular. Com os níveis que você registrou e os tempos de exposição de cada posto, calcule o tempo máximo permitido para cada nível, a dose diária, o nível de exposição, NE, e o nível de exposição normalizado, NEN, pela NHO-01. Digite os resultados nos campos.' },
+    { text: 'Etapa 5, parecer técnico. Classifique a exposição de acordo com os critérios da NHO-01, marque as medidas de controle recomendadas e escreva a sua conclusão. Revise as etapas e, quando estiver pronto, clique em Entregar.' },
+  ],
+  g2i: { text: 'Atividade prática com o dosímetro. Você vai avaliar a exposição da operadora da prensa durante a jornada. Cumpra as seis etapas: escolher a metodologia, ligar e calibrar o dosímetro, configurar o aparelho, instalar na trabalhadora e iniciar a medição, encerrar com a pós-calibração e dar o parecer técnico. Ao terminar, clique em Entregar para ver a sua nota.' },
+  a2: [
+    { text: 'Etapa 1, metodologia. Escolha o critério da avaliação: a NHO-01 da Fundacentro, para a avaliação ocupacional, ou o Anexo 1 da NR-15, para caracterizar a insalubridade. O dosímetro deverá ser configurado de acordo com essa escolha.' },
+    { text: 'Etapa 2, ligar e calibrar. Use as teclas do visor do dosímetro; pressão longa é segurar por 3 segundos. Ligue o aparelho, retire a espuma, acople o calibrador e faça a calibração pelo menu, em Dosimetria, Calibrar. Depois desacople o calibrador e recoloque a espuma.' },
+    { text: 'Etapa 3, configurar. Entre no menu do aparelho, em Ajustes, e configure a ponderação de frequência, a ponderação temporal, o nível limiar, o nível critério e a taxa de troca, de acordo com a metodologia escolhida.' },
+    { text: 'Etapa 4, instalar e medir. Instale o dosímetro no ombro do lado mais exposto à fonte de ruído, com o microfone na zona auditiva. Depois inicie a dosimetria pelo aparelho, segurando a tecla iniciar por 3 segundos. Você pode acelerar a jornada. Ao fim, pare a medição segurando a tecla parar por 3 segundos.' },
+    { text: 'Etapa 5, pós-calibrar. Com a medição parada, retire o dosímetro da trabalhadora, tire a espuma, acople o calibrador e escolha o nível no aparelho para fazer a pós-calibração.' },
+    { text: 'Etapa 6, parecer técnico. Leia no visor do dosímetro a dose e os níveis do critério escolhido, informe se a medição é válida, classifique a exposição, marque as medidas recomendadas e escreva a sua conclusão. Depois clique em Entregar.' },
+  ],
 };
 
 export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
@@ -78,11 +96,15 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
   let aluno = ''; try { aluno = localStorage.getItem('ativ.aluno') || ''; } catch {}
   // orientação falada: toca ao abrir a atividade e ao entrar em cada etapa (🔊 repete, 🔇 silencia)
   let voz = true; try { voz = localStorage.getItem('ativ.voz') !== '0'; } catch {}
+  let guiado = false; try { guiado = localStorage.getItem('ativ.modo') === 'guiado'; } catch {}
   let sayTok = 0;
   function orient(intro) {
-    if (!cur || !say) return; ++sayTok;
+    if (!cur || !say) return; const my = ++sayTok;
     if (!voz) { stopVoice?.(); return; }
-    say(intro || (cur.kind === 1 ? ORIENT.a1i : ORIENT.a2i).text);
+    if (!guiado) { say((cur.kind === 1 ? ORIENT.a1i : ORIENT.a2i).text); return; }
+    const step = () => (cur.kind === 1 ? ORIENT.a1 : ORIENT.a2)[cur.tab]?.text;
+    if (intro) say((cur.kind === 1 ? ORIENT.g1i : ORIENT.g2i).text).then(() => { if (my === sayTok && cur && voz) say(step()); });
+    else say(step());
   }
 
   // ── escolha da atividade ──
@@ -90,6 +112,9 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
     modal.innerHTML = `<div class="ui-report glass ativ-choose"><button class="ui-x">✕</button><h2>📝 Atividade prática avaliada</h2>
       <p class="sub">Realize todas as etapas e entregue para ver a nota (0 a 10).</p>
       <label class="ativ-name">Nome do aluno <input type="text" maxlength="60" value="${esc(aluno)}" placeholder="Digite seu nome"></label>
+      <div class="ativ-modo"><span>Modo</span>
+        <label><input type="radio" name="modo" value="prova" ${guiado ? '' : 'checked'}> <b>Avaliação</b> — sem orientação</label>
+        <label><input type="radio" name="modo" value="guiado" ${guiado ? 'checked' : ''}> <b>Com orientação passo a passo</b> — fala e dica em cada etapa</label></div>
       <div class="ui-chapters">
         <button class="ui-chap" data-a="1"><b>Atividade 1 · Decibelímetro</b><span>Avaliação prática com o decibelímetro.</span><em>5 etapas · 10 pontos</em></button>
         <button class="ui-chap" data-a="2"><b>Atividade 2 · Dosímetro</b><span>Avaliação prática com o dosímetro.</span><em>6 etapas · 10 pontos</em></button>
@@ -98,6 +123,7 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
     modal.querySelector('.ui-x').onclick = () => modal.classList.add('hidden');
     modal.querySelectorAll('.ui-chap').forEach((b) => (b.onclick = () => {
       aluno = modal.querySelector('.ativ-name input').value.trim(); try { localStorage.setItem('ativ.aluno', aluno); } catch {}
+      guiado = modal.querySelector('input[name="modo"]:checked')?.value === 'guiado'; try { localStorage.setItem('ativ.modo', guiado ? 'guiado' : 'prova'); } catch {}
       if (!aluno) { warn('Digite o nome do aluno para começar.'); modal.querySelector('.ativ-name input').focus(); return; }
       modal.classList.add('hidden'); b.dataset.a === '1' ? startA1() : startA2();
     }));
@@ -117,10 +143,11 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
 
   // ── moldura comum do painel ──
   function frame({ title, tabs, tab, body, caseHtml }) {
-    panel.innerHTML = `<div class="dz-h"><span>📝 ${title} · ${esc(aluno)}</span><button class="ui-x dz-x" title="Sair da atividade">✕</button></div>
+    panel.innerHTML = `<div class="dz-h"><span>📝 ${title} · ${esc(aluno)}${guiado ? ' · com orientação' : ''}</span><button class="ui-x dz-x" title="Sair da atividade">✕</button></div>
       ${caseHtml || ''}
       <div class="ativ-tabs">${tabs.map((t, i) => `<button data-t="${i}" class="${i === tab ? 'on' : ''}${cur.done?.[i] ? ' ok' : ''}">${i + 1}. ${t}</button>`).join('')}</div>
       <div class="ativ-voz"><button class="ui-btn ghost" data-v="ouvir">🔊 Ouvir</button><button class="ui-btn ghost" data-v="mudo">${voz ? '🔇 Silenciar' : '🔈 Ativar voz'}</button></div>
+      ${guiado ? `<div class="ativ-guia">💡 ${(cur.kind === 1 ? ORIENT.a1 : ORIENT.a2)[tab]?.text || ''}</div>` : ''}
       <div class="ativ-body">${body}</div>
       <div class="dz-nav"><button class="ui-btn" data-n="prev">◀ Etapa anterior</button><button class="ui-btn" data-n="next">Próxima etapa ▶</button><button class="ui-btn primary" data-n="send">Entregar ✓</button></div>`;
     panel.querySelector('.dz-x').onclick = () => { if (confirm('Sair da atividade? O progresso será perdido.')) exit(); };
@@ -180,7 +207,7 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
     const camLcd = () => { app.stage.flyTo(rig.spotCam(rig.at || 'm1', true), 1.8); app.stage.setFocus?.(rig.slm.lcdWorld(new THREE.Vector3())); };
     const camSpot = () => { app.stage.flyTo(rig.spotCam(rig.at || 'm1', false), 1.8); app.stage.setFocus?.(null); };
     cur.goTab = (t) => {
-      cur.tab = t; render();
+      const ch = t !== cur.tab; cur.tab = t; render(); if (ch && guiado) orient();
       if (t === 1) camHead(); else if (t === 0) camLcd(); else if (t === 2) camSpot();
       else { app.stage.flyTo({ pos: [3.2, 3.6, 4.6], target: [-2.2, 1.0, -5.0], fov: 52 }, 1.8); app.stage.setFocus?.(null); }
     };
@@ -339,7 +366,7 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
     const offEnd = app.on('workdayEnd', () => { if (cur?.kind === 2) { warn('Fim da jornada.'); render(); } });
     cur.cleanup = () => { offCal?.(); offFrame?.(); offEnd?.(); app.state.running = false; Object.assign(core.settings.user, userSaved); app.emit('change'); };
     const present = async () => { if (app.state.mounted) return; app.setView('calib', { animate: true, duration: 1.6 }); await app.present(app.dosimeter.group, 'presentDevice', 1.4); };
-    cur.goTab = (t) => { cur.tab = t; render();
+    cur.goTab = (t) => { const ch = t !== cur.tab; cur.tab = t; render(); if (ch && guiado) orient();
       if (t === 1 || t === 2 || (t === 4 && !app.state.mounted)) present();
       else if (t === 3) app.setView(app.state.mounted ? 'shoulder' : 'station', { animate: true, duration: 1.6 }); };
     const methodName = () => (S.method === 'NR15' ? 'NR-15, Anexo 1' : S.method === 'NHO01' ? 'NHO-01 (Fundacentro)' : '— escolha na etapa 1 —');
@@ -452,7 +479,7 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
     const groups = []; for (const r of rows) { let g = groups.find((x) => x.et === r.et); if (!g) groups.push((g = { et: r.et, pts: 0, max: 0, rows: [] })); g.pts += r.pts; g.max += r.max; g.rows.push(r); }
     const data = new Date().toLocaleString('pt-BR');
     modal.innerHTML = `<div class="ui-report glass ativ-bol"><button class="ui-x">✕</button>
-      <h2>Boletim — ${titulo}</h2><p class="sub">Aluno: <b>${esc(aluno)}</b> · ${data}</p>
+      <h2>Boletim — ${titulo}</h2><p class="sub">Aluno: <b>${esc(aluno)}</b> · ${data} · Modo: <b>${guiado ? 'com orientação passo a passo' : 'avaliação (sem orientação)'}</b></p>
       <div class="ativ-nota ${nota >= 6 ? 'ok' : 'bad'}"><span>Nota</span><b>${f1(nota, 1)}</b><small>de 10</small></div>
       <table class="dz-t ativ-tab"><tr><th>Etapa / item</th><th>Pontos</th><th>Observação</th></tr>
       ${groups.map((g) => `<tr class="grp"><td>${g.et}</td><td><b>${f1(g.pts, 2)} / ${f1(g.max, 2)}</b></td><td></td></tr>${g.rows.map((r) => `<tr><td>${r.pts >= r.max - 1e-6 ? '✓' : r.pts > 0 ? '◐' : '✗'} ${r.item}</td><td>${f1(r.pts, 2)} / ${f1(r.max, 2)}</td><td>${r.obs || ''}</td></tr>`).join('')}`).join('')}
