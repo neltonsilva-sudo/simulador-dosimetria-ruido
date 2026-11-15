@@ -268,7 +268,8 @@ export function createLCD() {
       text(tr(Pg.label), 64, 47, 'S', C.white, { align: 'center' });
       rbox(36, 62, 56, 22, selFill(62, 22), C.selB);
       text(String(Pg.values[pg.sel]), 64, 67, 'B', C.white, { align: 'center' });
-      triangle(30, 112, false, C.cyan); text('-', 42, 112, 'S', C.cyan); text('+', 81, 112, 'S', C.cyan); triangle(90, 112, true, C.cyan);
+      // dica acima das teclas: ▶❙❙ (2ª tecla) aumenta, ■ (3ª tecla) diminui
+      triangle(34, 112, true, C.cyan); text('+', 46, 112, 'S', C.cyan); text('-', 78, 112, 'S', C.cyan); triangle(86, 112, false, C.cyan);
       return;
     }
     if (Pg.type === 'fields') {

@@ -272,3 +272,7 @@
 .ativ-voz { display:flex; gap:6px; justify-content:flex-end; margin:-4px 0 6px; } .ativ-voz .ui-btn { padding:5px 10px; font-size:12.5px; }
 .ui-ativ .ui-btn:disabled { opacity:.38; cursor:default; filter:grayscale(1); }
 .ativ-lock { margin:6px 0 8px; padding:8px 12px; border-radius:9px; background:rgba(255,213,79,.12); color:#ffd54f; font-size:13.5px; font-weight:600; }
+.ui-dose.ativ-inline { position:static; width:auto; max-height:none; overflow:visible; padding:0; margin:0; }
+.ativ-formulas { margin:10px 0 4px; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.08); } .ativ-formulas h4 { margin:2px 0 4px; }
+.ativ-resol { display:flex; align-items:center; gap:10px; margin-top:8px; } .ativ-resol small { color:#9aa4ae; font-size:12.5px; }
+.ativ-res h4 { margin:14px 0 6px; color:#ffd54f; font-size:13px; text-transform:uppercase; letter-spacing:.04em; } .ativ-res .eq.big { justify-content:flex-start; }

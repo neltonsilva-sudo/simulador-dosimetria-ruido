@@ -67,7 +67,7 @@ export async function createStage(canvas, { quality = 'high', app } = {}) {
   stage.post = post;
 
   // ── tamanho + resolução dinâmica ──
-  const basePR = Math.min(devicePixelRatio || 1, quality === 'low' ? 1 : 1.5);
+  const basePR = Math.min(devicePixelRatio || 1, quality === 'low' ? 1 : quality === 'med' ? 1.5 : 2); // 'high': até 2× (teclas e textos nítidos em close)
   // Resolução dinâmica SEM piscar: (1) o redimensionamento é adiado para o início do próximo quadro, antes de desenhar
   // (redimensionar depois do render limpava o canvas e o navegador mostrava um quadro vazio); (2) histerese: só baixa após
   // 3 medições seguidas abaixo de 40 fps e só sobe após 8 s seguidos acima de 58 fps; nada nos primeiros 8 s (carga/shaders).

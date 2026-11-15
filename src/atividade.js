@@ -17,6 +17,26 @@ const hm = (min) => `${Math.floor(min / 60)} h${min % 60 ? ' ' + String(Math.rou
 const doseNHO = (Ls, Cs) => Ls.reduce((a, L, i) => a + Cs[i] / allowedMinutes(L, CRITERIA.NHO01), 0) * 100;
 const neFrom = (D, TE) => 10 * Math.log10((480 / TE) * (D / 100)) + 85;
 const nenFrom = (NE, TE) => NE + 10 * Math.log10(TE / 480);
+// resolução passo a passo (NHO-01) com os níveis informados
+function resolucaoHTML(nomes, Ls, Cs, TE) {
+  const T = Ls.map((L) => allowedMinutes(L, CRITERIA.NHO01)), fr = Cs.map((C, i) => C / T[i]), D = fr.reduce((a, b) => a + b, 0) * 100;
+  const NE = neFrom(D, TE), NEN = nenFrom(NE, TE), F = (n, d = 1) => f1(n, d);
+  const frac = (a, b) => `<span class="fr"><span>${a}</span><span>${b}</span></span>`;
+  return `<h4>1. Tempo máximo permitido para cada nível (NHO-01: q = 3, CR = 85 dB(A))</h4>
+    <div class="eq big">T<sub>n</sub> = ${frac('480', '2<sup>(L<sub>n</sub> − 85)/3</sup>')}</div>
+    ${Ls.map((L, i) => `<div class="eq">T<sub>${i + 1}</sub> = ${frac('480', `2<sup>(${F(L)} − 85)/3</sup>`)} = ${frac('480', F(Math.pow(2, (L - 85) / 3), 3))} = <b>${F(T[i])} min</b> <small>(${esc(nomes[i])})</small></div>`).join('')}
+    <h4>2. Dose diária</h4>
+    <div class="eq big">D = (${Cs.map((_, i) => frac(`C<sub>${i + 1}</sub>`, `T<sub>${i + 1}</sub>`)).join(' + ')}) × 100</div>
+    <div class="eq">D = (${Cs.map((C, i) => frac(C, F(T[i]))).join(' + ')}) × 100</div>
+    <div class="eq">D = (${fr.map((x) => F(x, 3)).join(' + ')}) × 100 = <b class="res">${F(D)} %</b></div>
+    <h4>3. Nível de exposição (NE)</h4>
+    <div class="eq big">NE = 10 · log[${frac('480', 'TE')} · ${frac('D', '100')}] + 85</div>
+    <div class="eq">NE = 10 · log[${frac('480', TE)} · ${frac(F(D), '100')}] + 85 = 10 · log(${F((480 / TE) * (D / 100), 3)}) + 85 = <b class="res">${F(NE)} dB(A)</b></div>
+    <h4>4. Nível de exposição normalizado (NEN)</h4>
+    <div class="eq big">NEN = NE + 10 · log${'(' + frac('TE', '480') + ')'}</div>
+    <div class="eq">NEN = ${F(NE)} + 10 · log(${frac(TE, '480')}) = ${F(NE)} + ${F(10 * Math.log10(TE / 480), 2)} = <b class="res">${F(NEN)} dB(A)</b></div>
+    <h4>5. Classificação (NHO-01)</h4><p class="dz-p">Dose ${F(D)} % · NEN ${F(NEN)} dB(A) → <b>${CLS_NHO[clsNHO(D)]}</b></p>`;
+}
 const clsNHO = (D) => (D <= 50 ? 0 : D <= 80 ? 1 : D <= 100 ? 2 : 3);
 const clsNR15 = (D) => (D <= 50 ? 0 : D <= 100 ? 1 : 2);
 const CLS_NHO = ['Aceitável', 'Acima do nível de ação', 'Região de incerteza', 'Acima do limite de exposição'];
@@ -182,9 +202,15 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
           <td><button class="ui-btn ${S.regs[m.key] ? 'ok' : ''}" data-reg="${i}">${S.regs[m.key] ? '✓ Registrado' : 'Registrar'}</button></td></tr>`).join('')}</table>`;
       else if (t === 3) body = `<h3>Calcular a dose, o NE e o NEN (NHO-01)</h3>
         <table class="dz-t"><tr><th>Posto</th><th>L registrado</th><th>C (min)</th></tr>${A1.map((m, i) => `<tr><td>${i + 1}. ${m.nome}</td><td><b>${S.regs[m.key] ? f1(S.regs[m.key].val) + ' dB(A)' : '—'}</b></td><td>${Cs[i]}</td></tr>`).join('')}</table>
+        <div class="ativ-formulas"><h4>Fórmulas (NHO-01)</h4>
+          <div class="eq">T<sub>n</sub> = 480 / 2<sup>(L<sub>n</sub> − 85)/3</sup></div>
+          <div class="eq">D = (C<sub>1</sub>/T<sub>1</sub> + C<sub>2</sub>/T<sub>2</sub> + C<sub>3</sub>/T<sub>3</sub>) × 100</div>
+          <div class="eq">NE = 10 · log[(480/TE) · (D/100)] + 85</div>
+          <div class="eq">NEN = NE + 10 · log(TE/480)</div></div>
         <div class="ativ-form"><label>Dose diária (%)<input data-in="dose" inputmode="decimal"></label>
           <label>NE (dB(A))<input data-in="ne" inputmode="decimal"></label>
-          <label>NEN (dB(A))<input data-in="nen" inputmode="decimal"></label></div>`;
+          <label>NEN (dB(A))<input data-in="nen" inputmode="decimal"></label></div>
+        <div class="ativ-resol"><button class="ui-btn" data-a="resol">📐 Resolução</button>${cur.submitted ? '' : '<small>disponível após a entrega</small>'}</div>`;
       else body = `<h3>Parecer técnico (NHO-01)</h3>
         <h4>Classificação</h4><div class="ativ-radio">${CLS_NHO.map((c, i) => `<label><input type="radio" name="cls1" data-in="cls" value="${i}"> ${c}</label>`).join('')}</div>
         <h4>Medidas recomendadas</h4><div class="ativ-check">${MEAS.map(([k, l]) => `<label><input type="checkbox" data-in="meas" value="${k}"> ${l}</label>`).join('')}</div>
@@ -203,6 +229,7 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
     }
     function act(a) {
       const sc = rig.scal;
+      if (a === 'resol') return cur.submitted ? showResol() : warn('A resolução fica disponível após a entrega.');
       if (S.firstRegErr && a !== 'foam') return warn('Ação não permitida neste momento.');
       if (a === 'foam') { if (!S.foam && rig.coupled) return warn('Ação não permitida neste momento.'); S.foam = !S.foam; rig.slm.setWindscreen(S.foam); }
       else if (a === 'couple') {
@@ -231,7 +258,14 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
       if (S.firstRegErr == null) S.firstRegErr = { err: rig.err, foam: S.foam, coupled: rig.coupled, calOff: !md.cal };
       app.audio?.beep?.('ok'); render();
     }
+    function showResol() {
+      const Lst = A1.map((m, i) => S.regs[m.key]?.val ?? Ls[i]);
+      resolModal(`Resolução — dose, NE e NEN (NHO-01)`, `<p class="sub">Calculado com os níveis registrados por você${A1.some((m) => !S.regs[m.key]) ? ' (postos sem registro usam o nível real)' : ''}.</p>${resolucaoHTML(A1.map((m) => m.nome), Lst, Cs, TE)}
+        ${Lst.some((L, i) => Math.abs(L - Ls[i]) > 0.05) ? `<h4>Com os níveis reais</h4><p class="dz-p">Dose ${f1(doseNHO(Ls, Cs))} % · NE ${f1(neFrom(doseNHO(Ls, Cs), TE))} dB(A) · NEN ${f1(nenFrom(neFrom(doseNHO(Ls, Cs), TE), TE))} dB(A)</p>` : ''}`);
+    }
+    cur.showResol = showResol;
     cur.submit = () => {
+      cur.submitted = true; render();
       const rows = []; const add = (et, item, pts, max, obs = '') => rows.push({ et, item, pts: Math.max(0, Math.min(max, pts)), max, obs });
       // 1. configuração (média das leituras registradas)
       const regs = A1.map((m) => S.regs[m.key]).filter(Boolean);
@@ -293,6 +327,11 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
         if (st.mode === 'stopped') { app.state.running = false; S.ended = true; app.emit('change'); render(); }
         lastMode = st.mode;
       }
+      // medição em andamento (mesmo se começou antes de abrir a atividade): a jornada simulada corre e acelera
+      if (['run', 'pause'].includes(st.mode) && !app.state.running && app.state.clock < app.workday.end) {
+        if (!S.start) S.start = { mounted: app.state.mounted, side: S.side, coupled: app.state.calibratorCoupled, foam: S.foam, user: { ...core.settings.user }, cal: S.cal, preCal: st.preCal ? { ...st.preCal } : null };
+        app.state.running = true; app.emit('change');
+      }
       if (st.postCal && !st.postCal.skipped && !S.post) { S.post = { ...st.postCal }; render(); }
       const ck = panel.querySelector('[data-clock]'); if (ck) ck.textContent = app.fmtClock ? app.fmtClock(app.state.clock) : '';
       const us = panel.querySelector('[data-user]'); if (us) { const u = core.settings.user; us.textContent = `P. Frequência ${u.weighting} · P. Temporal ${u.response === 'F' ? 'Rápida (F)' : 'Lenta (S)'} · Limiar ${u.TL} dB · Critério ${u.CR} dB · Taxa de troca q = ${u.q} dB`; }
@@ -338,7 +377,7 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
       panel.querySelectorAll('input[name="met"]').forEach((el) => (el.onchange = () => { if (S.start) return warn('A dosimetria já começou.'); S.method = el.value; render(); }));
       panel.querySelectorAll('[data-a]').forEach((b) => (b.onclick = () => act(b.dataset.a)));
       panel.querySelectorAll('[data-side]').forEach((b) => (b.onclick = () => mount(b.dataset.side)));
-      panel.querySelectorAll('[data-sp]').forEach((b) => (b.onclick = () => { app.setSpeed(+b.dataset.sp); render(); }));
+      panel.querySelectorAll('[data-sp]').forEach((b) => (b.onclick = () => { app.setSpeed(+b.dataset.sp); if (!app.state.running) warn('A aceleração vale durante a medição.'); render(); }));
     }
     async function act(a) {
       if (a === 'foam') {
@@ -398,6 +437,15 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
     cur.rerender = render; render(); present(); orient(ORIENT.a2i.text);
   }
 
+  // ── resolução (modal) ──
+  let lastBoletim = null;
+  function resolModal(titulo, html) {
+    modal.innerHTML = `<div class="ui-report glass ativ-bol ativ-res"><button class="ui-x">✕</button><h2>${titulo}</h2><div class="ui-dose ativ-inline">${html}</div>
+      <div class="ativ-bol-nav">${lastBoletim ? '<button class="ui-btn" data-b="bol">◀ Boletim</button>' : ''}<button class="ui-btn primary" data-b="close">Fechar</button></div></div>`;
+    modal.classList.remove('hidden');
+    modal.querySelector('.ui-x').onclick = modal.querySelector('[data-b="close"]').onclick = () => modal.classList.add('hidden');
+    const bb = modal.querySelector('[data-b="bol"]'); if (bb) bb.onclick = () => boletim(lastBoletim);
+  }
   // ── boletim ──
   function boletim({ titulo, rows, extra }) {
     const tot = rows.reduce((a, r) => a + r.pts, 0), max = rows.reduce((a, r) => a + r.max, 0), nota = Math.round((tot / max) * 100) / 10;
@@ -409,10 +457,12 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
       <table class="dz-t ativ-tab"><tr><th>Etapa / item</th><th>Pontos</th><th>Observação</th></tr>
       ${groups.map((g) => `<tr class="grp"><td>${g.et}</td><td><b>${f1(g.pts, 2)} / ${f1(g.max, 2)}</b></td><td></td></tr>${g.rows.map((r) => `<tr><td>${r.pts >= r.max - 1e-6 ? '✓' : r.pts > 0 ? '◐' : '✗'} ${r.item}</td><td>${f1(r.pts, 2)} / ${f1(r.max, 2)}</td><td>${r.obs || ''}</td></tr>`).join('')}`).join('')}
       </table>${extra || ''}
-      <div class="ativ-bol-nav"><button class="ui-btn" data-b="print">🖨 Imprimir / PDF</button><button class="ui-btn" data-b="back">Voltar à atividade</button><button class="ui-btn primary" data-b="end">Encerrar</button></div></div>`;
+      <div class="ativ-bol-nav">${cur?.showResol ? '<button class="ui-btn" data-b="resol">📐 Resolução</button>' : ''}<button class="ui-btn" data-b="print">🖨 Imprimir / PDF</button><button class="ui-btn" data-b="back">Voltar à atividade</button><button class="ui-btn primary" data-b="end">Encerrar</button></div></div>`;
     modal.classList.remove('hidden');
     modal.querySelector('.ui-x').onclick = () => modal.classList.add('hidden');
     modal.querySelector('[data-b="back"]').onclick = () => modal.classList.add('hidden');
+    const rb = modal.querySelector('[data-b="resol"]'); if (rb) rb.onclick = () => cur.showResol();
+    lastBoletim = { titulo, rows, extra };
     modal.querySelector('[data-b="print"]').onclick = () => { document.body.classList.add('print-ativ'); window.print(); setTimeout(() => document.body.classList.remove('print-ativ'), 500); };
     modal.querySelector('[data-b="end"]').onclick = () => { modal.classList.add('hidden'); exit(); };
   }

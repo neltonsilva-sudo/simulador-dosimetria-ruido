@@ -156,8 +156,8 @@ export function buildDosimeter(stage, fw, app) {
 
   // ── teclas de silicone com ícones serigrafados (tinta branca fina) ──
   const keyMat = tpeMat(0x2a90ea, 0.48); keyMat.sheen = 0.55; keyMat.vertexColors = false;
-  const icoMat = new THREE.MeshStandardMaterial({ color: 0xeef1f4, roughness: 0.62, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
-  const keyGeo = extrudeSmooth(roundRectArc(8.6, 8.4, 2.1), 2.4, { bt: 0.95, bs: 1.0, seg: 5 });
+  const icoMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.28, roughness: 0.55, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }); // tinta branca viva (como as teclas do painel)
+  const keyGeo = extrudeSmooth(roundRectArc(8.6, 8.4, 1.8), 2.4, { bt: 0.55, bs: 0.6, seg: 6 }); // tampo plano e borda definida
   const keys = {}, keyOutline = {}, keyRest = {};
   ['power', 'play', 'stop', 'menu'].forEach((k, i) => {
     const m = add(keyGeo, keyMat); m.position.set(-15.75 + i * 10.5, -25.2, FRONT + 0.85); m.name = 'tecla_' + k; m.userData.key = k;
