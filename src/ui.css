@@ -270,3 +270,4 @@
   body.print-ativ .ativ-bol { color:#000; background:#fff; } body.print-ativ .ativ-tab tr.grp td { color:#000; } }
 @media (max-width: 760px) { .ativ-act span { min-width:auto; width:100%; } }
 .ativ-voz { display:flex; gap:6px; justify-content:flex-end; margin:-4px 0 6px; } .ativ-voz .ui-btn { padding:5px 10px; font-size:12.5px; }
+.ui-ativ .ui-btn:disabled { opacity:.38; cursor:default; filter:grayscale(1); }

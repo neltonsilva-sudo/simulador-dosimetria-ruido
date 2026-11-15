@@ -19,10 +19,8 @@ const neFrom = (D, TE) => 10 * Math.log10((480 / TE) * (D / 100)) + 85;
 const nenFrom = (NE, TE) => NE + 10 * Math.log10(TE / 480);
 const clsNHO = (D) => (D <= 50 ? 0 : D <= 80 ? 1 : D <= 100 ? 2 : 3);
 const clsNR15 = (D) => (D <= 50 ? 0 : D <= 100 ? 1 : 2);
-const CLS_NHO = ['Aceitável — dose até 50 % (NEN até 82 dB(A))', 'Acima do nível de ação — 50 a 80 % (82 a 84 dB(A)): medidas preventivas',
-  'Região de incerteza — 80 a 100 % (84 a 85 dB(A)): medidas preventivas e corretivas', 'Acima do limite de exposição — mais de 100 % (NEN > 85 dB(A)): medidas corretivas imediatas'];
-const CLS_NR15 = ['Abaixo do nível de ação — dose até 50 %', 'Entre o nível de ação e o limite de tolerância — 50 a 100 %: salubre, com medidas preventivas',
-  'Acima do limite de tolerância — dose maior que 100 %: insalubre em grau médio (20 %)'];
+const CLS_NHO = ['Aceitável', 'Acima do nível de ação', 'Região de incerteza', 'Acima do limite de exposição'];
+const CLS_NR15 = ['Abaixo do nível de ação', 'Entre o nível de ação e o limite de tolerância', 'Acima do limite de tolerância (insalubre)'];
 const MEAS = [['fonte', 'Controle na fonte / proteção coletiva (enclausuramento, manutenção, amortecimento)'], ['adm', 'Medidas administrativas (reduzir o tempo de exposição, rodízio)'],
   ['epi', 'Protetor auricular com CA válido e atenuação adequada'], ['pca', 'Programa de conservação auditiva e audiometrias (PCMSO)'], ['monit', 'Manter monitoramento / reavaliação periódica']];
 function measScore(cls, sel, nr15) { // 0..1 — coerência das medidas com a classificação
@@ -44,23 +42,8 @@ const RANGES_LO_HI = (r) => String(r || '30–130').split('–').map(Number);
 
 // Orientações faladas (voz Francisca gravada por tools/gen_tts.py a partir dos campos `text:` — não mudar sem regenerar)
 const ORIENT = {
-  a1i: { text: 'Atividade prática com o decibelímetro. Você vai avaliar a exposição de um operador que trabalha em três postos durante a jornada. Cumpra as cinco etapas: configurar o medidor, calibrar, medir o ruído das três máquinas, calcular a dose, o NE e o NEN pela NHO-01 e dar o parecer técnico. Cada etapa vale pontos. Quando terminar, clique em Entregar para ver a sua nota.' },
-  a1: [
-    { text: 'Etapa 1, configurar. O decibelímetro veio configurado para outro uso. Use as teclas do visor, no canto esquerdo, para deixá-lo pronto para avaliar a exposição ocupacional a ruído contínuo: escolha o circuito de ponderação na tecla A barra C, a resposta na tecla F barra S, desligue a retenção do máximo e ajuste a faixa de medição na tecla LEVEL, para que o valor não fique fora da escala.' },
-    { text: 'Etapa 2, calibrar. Antes de medir, verifique o medidor com o calibrador acústico. Retire a espuma do microfone, acople o calibrador e ligue-o em 94 ou 114 decibéis. Ligue o modo CAL e use os botões mais e menos até o visor indicar o mesmo valor do calibrador. Depois desligue o CAL, desacople o calibrador e recoloque a espuma.' },
-    { text: 'Etapa 3, medir. Leve o decibelímetro a cada um dos três postos. Com o microfone na zona auditiva, espere a leitura estabilizar, leia o valor no visor do aparelho e registre. Faça isso nas três máquinas.' },
-    { text: 'Etapa 4, calcular. Com os níveis que você registrou e os tempos de exposição de cada posto, calcule o tempo máximo permitido para cada nível, a dose diária, o nível de exposição, NE, e o nível de exposição normalizado, NEN, pela NHO-01. Digite os resultados nos campos.' },
-    { text: 'Etapa 5, parecer técnico. Classifique a exposição de acordo com os critérios da NHO-01, marque as medidas de controle recomendadas e escreva a sua conclusão. Revise as etapas e, quando estiver pronto, clique em Entregar.' },
-  ],
-  a2i: { text: 'Atividade prática com o dosímetro. Você vai avaliar a exposição da operadora da prensa durante a jornada. Cumpra as seis etapas: escolher a metodologia, ligar e calibrar o dosímetro, configurar o aparelho, instalar na trabalhadora e iniciar a medição, encerrar com a pós-calibração e dar o parecer técnico. Ao terminar, clique em Entregar para ver a sua nota.' },
-  a2: [
-    { text: 'Etapa 1, metodologia. Escolha o critério da avaliação: a NHO-01 da Fundacentro, para a avaliação ocupacional, ou o Anexo 1 da NR-15, para caracterizar a insalubridade. O dosímetro deverá ser configurado de acordo com essa escolha.' },
-    { text: 'Etapa 2, ligar e calibrar. Use as teclas do visor do dosímetro; pressão longa é segurar por 3 segundos. Ligue o aparelho, retire a espuma, acople o calibrador e faça a calibração pelo menu, em Dosimetria, Calibrar. Depois desacople o calibrador e recoloque a espuma.' },
-    { text: 'Etapa 3, configurar. Entre no menu do aparelho, em Ajustes, e configure a ponderação de frequência, a ponderação temporal, o nível limiar, o nível critério e a taxa de troca, de acordo com a metodologia escolhida.' },
-    { text: 'Etapa 4, instalar e medir. Instale o dosímetro no ombro do lado mais exposto à fonte de ruído, com o microfone na zona auditiva. Depois inicie a dosimetria pelo aparelho, segurando a tecla iniciar por 3 segundos. Você pode acelerar a jornada. Ao fim, pare a medição segurando a tecla parar por 3 segundos.' },
-    { text: 'Etapa 5, pós-calibrar. Com a medição parada, retire o dosímetro da trabalhadora, tire a espuma, acople o calibrador e escolha o nível no aparelho para fazer a pós-calibração.' },
-    { text: 'Etapa 6, parecer técnico. Leia no visor do dosímetro a dose e os níveis do critério escolhido, informe se a medição é válida, classifique a exposição, marque as medidas recomendadas e escreva a sua conclusão. Depois clique em Entregar.' },
-  ],
+  a1i: { text: 'Atividade avaliativa com o decibelímetro. Realize as etapas de 1 a 5. Ao terminar, clique em Entregar.' },
+  a2i: { text: 'Atividade avaliativa com o dosímetro. Realize as etapas de 1 a 6. Ao terminar, clique em Entregar.' },
 };
 
 export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
@@ -77,22 +60,20 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
   let voz = true; try { voz = localStorage.getItem('ativ.voz') !== '0'; } catch {}
   let sayTok = 0;
   function orient(intro) {
-    if (!cur || !say) return; const my = ++sayTok, list = cur.kind === 1 ? ORIENT.a1 : ORIENT.a2, t = list[cur.tab]?.text;
+    if (!cur || !say) return; ++sayTok;
     if (!voz) { stopVoice?.(); return; }
-    if (intro) say(intro).then(() => { if (my === sayTok && cur && voz) say(list[cur.tab].text); });
-    else if (t) say(t);
+    say(intro || (cur.kind === 1 ? ORIENT.a1i : ORIENT.a2i).text);
   }
 
   // ── escolha da atividade ──
   function chooser() {
     modal.innerHTML = `<div class="ui-report glass ativ-choose"><button class="ui-x">✕</button><h2>📝 Atividade prática avaliada</h2>
-      <p class="sub">Cumpra as etapas no simulador. Cada etapa vale pontos e, ao entregar, sai o boletim com a nota de 0 a 10 e a correção comentada.</p>
+      <p class="sub">Realize todas as etapas e entregue para ver a nota (0 a 10).</p>
       <label class="ativ-name">Nome do aluno <input type="text" maxlength="60" value="${esc(aluno)}" placeholder="Digite seu nome"></label>
       <div class="ui-chapters">
-        <button class="ui-chap" data-a="1"><b>Atividade 1 · Decibelímetro</b><span>Configurar e calibrar o medidor, medir o ruído de 3 máquinas, calcular dose, NE e NEN (NHO-01) e dar o parecer técnico.</span><em>5 etapas · 10 pontos</em></button>
-        <button class="ui-chap" data-a="2"><b>Atividade 2 · Dosímetro</b><span>Escolher a metodologia (NHO-01 ou NR-15 Anexo 1), ligar, calibrar e configurar o dosímetro, instalar na trabalhadora, medir a jornada, pós-calibrar e dar o parecer.</span><em>6 etapas · 10 pontos</em></button>
-      </div>
-      <details class="ativ-crit"><summary>Critérios de avaliação (etapas e pontos)</summary>${critTable()}</details></div>`;
+        <button class="ui-chap" data-a="1"><b>Atividade 1 · Decibelímetro</b><span>Avaliação prática com o decibelímetro.</span><em>5 etapas · 10 pontos</em></button>
+        <button class="ui-chap" data-a="2"><b>Atividade 2 · Dosímetro</b><span>Avaliação prática com o dosímetro.</span><em>6 etapas · 10 pontos</em></button>
+      </div></div>`;
     modal.classList.remove('hidden');
     modal.querySelector('.ui-x').onclick = () => modal.classList.add('hidden');
     modal.querySelectorAll('.ui-chap').forEach((b) => (b.onclick = () => {
@@ -119,7 +100,7 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
     panel.innerHTML = `<div class="dz-h"><span>📝 ${title} · ${esc(aluno)}</span><button class="ui-x dz-x" title="Sair da atividade">✕</button></div>
       ${caseHtml || ''}
       <div class="ativ-tabs">${tabs.map((t, i) => `<button data-t="${i}" class="${i === tab ? 'on' : ''}${cur.done?.[i] ? ' ok' : ''}">${i + 1}. ${t}</button>`).join('')}</div>
-      <div class="ativ-voz"><button class="ui-btn ghost" data-v="ouvir">🔊 Ouvir a orientação</button><button class="ui-btn ghost" data-v="mudo">${voz ? '🔇 Silenciar' : '🔈 Ativar voz'}</button></div>
+      <div class="ativ-voz"><button class="ui-btn ghost" data-v="ouvir">🔊 Ouvir</button><button class="ui-btn ghost" data-v="mudo">${voz ? '🔇 Silenciar' : '🔈 Ativar voz'}</button></div>
       <div class="ativ-body">${body}</div>
       <div class="dz-nav"><button class="ui-btn" data-n="prev">◀ Etapa anterior</button><button class="ui-btn" data-n="next">Próxima etapa ▶</button><button class="ui-btn primary" data-n="send">Entregar ✓</button></div>`;
     panel.querySelector('.dz-x').onclick = () => { if (confirm('Sair da atividade? O progresso será perdido.')) exit(); };
@@ -178,42 +159,35 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
     const camLcd = () => { app.stage.flyTo(rig.spotCam(rig.at || 'm1', true), 1.8); app.stage.setFocus?.(rig.slm.lcdWorld(new THREE.Vector3())); };
     const camSpot = () => { app.stage.flyTo(rig.spotCam(rig.at || 'm1', false), 1.8); app.stage.setFocus?.(null); };
     cur.goTab = (t) => {
-      const ch = t !== cur.tab; cur.tab = t; render(); if (ch) orient();
+      cur.tab = t; render();
       if (t === 1) camHead(); else if (t === 0) camLcd(); else if (t === 2) camSpot();
       else { app.stage.flyTo({ pos: [3.2, 3.6, 4.6], target: [-2.2, 1.0, -5.0], fov: 52 }, 1.8); app.stage.setFocus?.(null); }
     };
     function render() {
       const t = cur.tab; let body = '';
-      if (t === 0) body = `<h3>Configurar o decibelímetro</h3><p class="dz-p">O medidor veio com a configuração de outro uso. Use as teclas do <b>Visor do decibelímetro</b> (canto esquerdo) para deixá-lo pronto para avaliar exposição ocupacional a ruído contínuo.</p>
-        <ul class="ativ-list"><li><b>A/C</b> — circuito de ponderação</li><li><b>F/S</b> — resposta (rápida / lenta)</li><li><b>MAX/MIN</b> — retenção do máximo</li><li><b>LEVEL</b> — faixa de medição (OVER/UNDER = fora da faixa)</li></ul>
-        <p class="dz-note">A configuração é conferida a cada leitura que você registrar na etapa 3.</p>`;
-      else if (t === 1) body = `<h3>Calibrar o decibelímetro</h3><p class="dz-p">Verifique o medidor com o calibrador acústico antes de medir. O visor deve indicar o mesmo nível do calibrador; se não indicar, ajuste no modo <b>CAL</b>.</p>
+      if (t === 0) body = `<h3>Configurar o decibelímetro</h3>`;
+      else if (t === 1) body = `<h3>Calibrar o decibelímetro</h3>
         <div class="ativ-act">
-          <div><span>Microfone</span><button class="ui-btn" data-a="foam">${S.foam ? 'Retirar a espuma' : 'Recolocar a espuma'}</button></div>
+          <div><span>Microfone</span><button class="ui-btn" data-a="foam" ${S.foam ? '' : 'disabled'}>Retirar a espuma</button></div>
           <div><span>Calibrador</span><button class="ui-btn" data-a="couple">${rig.coupled ? 'Desacoplar' : 'Acoplar ao microfone'}</button>
             <button class="ui-btn" data-a="cpow">⏻</button><button class="ui-btn" data-a="c94">94 dB</button><button class="ui-btn" data-a="c114">114 dB</button></div>
           <div><span>Decibelímetro</span><button class="ui-btn ${rig.slm.mode.cal ? 'on' : ''}" data-a="cal">CAL ${rig.slm.mode.cal ? 'ligado' : 'desligado'}</button>
-            <button class="ui-btn" data-a="dn">− 0,1</button><button class="ui-btn" data-a="up">+ 0,1</button></div></div>
-        <div class="dz-live">Calibrador: <small data-calst></small> <span class="ativ-hint">— leia o valor no Visor do decibelímetro</span></div>
-        <p class="dz-note">Os botões ± só funcionam com o CAL ligado. Ao terminar: CAL desligado, calibrador desacoplado e espuma recolocada.</p>`;
-      else if (t === 2) body = `<h3>Medir o ruído das 3 máquinas</h3><p class="dz-p">Leve o decibelímetro (no tripé, na zona auditiva) a cada posto, espere a leitura estabilizar e registre o valor do visor.</p>
+            <button class="ui-btn" data-a="dn">− 0,1</button><button class="ui-btn" data-a="up">+ 0,1</button></div>
+          <div><span>Microfone</span><button class="ui-btn" data-a="foam" ${S.foam ? 'disabled' : ''}>Recolocar a espuma</button></div></div>`;
+      else if (t === 2) body = `<h3>Medir o ruído das 3 máquinas</h3>
         <table class="dz-t ativ-med"><tr><th>Posto</th><th>Levar o medidor</th><th>Leitura (dB)</th><th></th></tr>${A1.map((m, i) => `<tr class="${rig.at === m.key ? 'here' : ''}"><td>${i + 1}. ${m.nome}</td>
           <td><button class="ui-btn" data-go="${m.key}">${rig.at === m.key ? '📍 Aqui' : 'Ir até lá'}</button></td>
           <td><input data-rd="${i}" inputmode="decimal" placeholder="ex.: 87,4" value="${esc(S.readings[i])}"></td>
-          <td><button class="ui-btn ${S.regs[m.key] ? 'ok' : ''}" data-reg="${i}">${S.regs[m.key] ? '✓ Registrado' : 'Registrar'}</button></td></tr>`).join('')}</table>
-        <p class="dz-note">Leia o valor no <b>Visor do decibelímetro</b> (canto esquerdo) — a leitura que vale é a do aparelho.</p>`;
+          <td><button class="ui-btn ${S.regs[m.key] ? 'ok' : ''}" data-reg="${i}">${S.regs[m.key] ? '✓ Registrado' : 'Registrar'}</button></td></tr>`).join('')}</table>`;
       else if (t === 3) body = `<h3>Calcular a dose, o NE e o NEN (NHO-01)</h3>
-        <table class="dz-t"><tr><th>Posto</th><th>L registrado</th><th>C (min)</th></tr>${A1.map((m, i) => `<tr><td>${i + 1}. ${m.nome}</td><td><b>${S.regs[m.key] ? f1(S.regs[m.key].val) + ' dB(A)' : '— (registre na etapa 3)'}</b></td><td>${Cs[i]}</td></tr>`).join('')}</table>
-        <div class="eq">T<sub>n</sub> = 480 / 2<sup>(L<sub>n</sub> − 85)/3</sup></div><div class="eq">D = (C<sub>1</sub>/T<sub>1</sub> + C<sub>2</sub>/T<sub>2</sub> + C<sub>3</sub>/T<sub>3</sub>) × 100</div>
-        <div class="eq">NE = 10 · log[(480/TE) · (D/100)] + 85 &nbsp;·&nbsp; NEN = NE + 10 · log(TE/480)</div>
-        <div class="ativ-form"><label>Dose diária (%)<input data-in="dose" inputmode="decimal" placeholder="ex.: 123,4"></label>
-          <label>NE (dB(A))<input data-in="ne" inputmode="decimal" placeholder="ex.: 86,1"></label>
-          <label>NEN (dB(A))<input data-in="nen" inputmode="decimal" placeholder="ex.: 86,5"></label></div>
-        <p class="dz-note">Use os níveis que você registrou. TE = ${TE} min.</p>`;
-      else body = `<h3>Parecer técnico (NHO-01)</h3><p class="dz-p">Classifique a exposição e indique as medidas.</p>
-        <div class="ativ-radio">${CLS_NHO.map((c, i) => `<label><input type="radio" name="cls1" data-in="cls" value="${i}"> ${c}</label>`).join('')}</div>
+        <table class="dz-t"><tr><th>Posto</th><th>L registrado</th><th>C (min)</th></tr>${A1.map((m, i) => `<tr><td>${i + 1}. ${m.nome}</td><td><b>${S.regs[m.key] ? f1(S.regs[m.key].val) + ' dB(A)' : '—'}</b></td><td>${Cs[i]}</td></tr>`).join('')}</table>
+        <div class="ativ-form"><label>Dose diária (%)<input data-in="dose" inputmode="decimal"></label>
+          <label>NE (dB(A))<input data-in="ne" inputmode="decimal"></label>
+          <label>NEN (dB(A))<input data-in="nen" inputmode="decimal"></label></div>`;
+      else body = `<h3>Parecer técnico (NHO-01)</h3>
+        <h4>Classificação</h4><div class="ativ-radio">${CLS_NHO.map((c, i) => `<label><input type="radio" name="cls1" data-in="cls" value="${i}"> ${c}</label>`).join('')}</div>
         <h4>Medidas recomendadas</h4><div class="ativ-check">${MEAS.map(([k, l]) => `<label><input type="checkbox" data-in="meas" value="${k}"> ${l}</label>`).join('')}</div>
-        <label class="ativ-text">Parecer (texto livre, vai para o boletim)<textarea data-in="texto" rows="3" placeholder="Conclusão técnica…"></textarea></label>`;
+        <label class="ativ-text">Parecer técnico<textarea data-in="texto" rows="3"></textarea></label>`;
       frame({ title: 'Atividade 1 · Decibelímetro', tabs: TABS, tab: t, body, caseHtml: caseHtml() });
       bindInputs(S.ans);
       panel.querySelectorAll('[data-a]').forEach((b) => (b.onclick = () => act(b.dataset.a)));
@@ -223,26 +197,26 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
     }
     function act(a) {
       const sc = rig.scal;
-      if (a === 'foam') { if (!S.foam && rig.coupled) return warn('Desacople o calibrador antes de recolocar a espuma.'); S.foam = !S.foam; rig.slm.setWindscreen(S.foam); }
+      if (a === 'foam') { if (!S.foam && rig.coupled) return warn('Ação não permitida neste momento.'); S.foam = !S.foam; rig.slm.setWindscreen(S.foam); }
       else if (a === 'couple') {
         if (rig.coupled) { if (sc.isOn()) rig.calSet(0); rig.uncouple(); } // desliga o calibrador ao retirar
-        else { if (S.foam) return warn('Retire a espuma do microfone antes de acoplar o calibrador.'); if (rig.at && rig.SPOTS[rig.at]) camHead(); S.cal.foamOffAtCouple = true; rig.couple(); }
+        else { if (S.foam) return warn('Ação não permitida neste momento.'); if (rig.at && rig.SPOTS[rig.at]) camHead(); S.cal.foamOffAtCouple = true; rig.couple(); }
       } else if (a === 'cpow') rig.calSet(sc.isOn() ? 0 : sc.level());
       else if (a === 'c94' || a === 'c114') rig.calSet(a === 'c94' ? 94 : 114);
       else if (a === 'cal') rig.slm.setMode({ cal: !rig.slm.mode.cal });
       else if (a === 'up' || a === 'dn') {
-        if (!rig.slm.mode.cal) return warn('Ligue o modo CAL para ajustar.');
+        if (!rig.slm.mode.cal) { app.audio?.beep?.('err'); return; } // sem CAL a tecla não ajusta (sem dica)
         if (!(rig.coupled && sc.isOn())) S.cal.blind = true; // ajuste sem sinal de referência
         S.cal.adjusted = true; rig.setErr(Math.round((rig.err + (a === 'up' ? 0.1 : -0.1)) * 10) / 10);
       }
       app.audio?.beep?.('key'); setTimeout(render, a === 'couple' ? 1700 : 0);
     }
     function goSpot(k) {
-      if (rig.coupled) return warn('Desacople o calibrador antes de levar o medidor.');
+      if (rig.coupled) return warn('Ação não permitida neste momento.');
       rig.place(k); rig.solo([A1.find((m) => m.key === k).id]); camSpot(); render();
     }
     function register(i) {
-      const m = A1[i]; if (rig.at !== m.key) return warn(`Leve o medidor até o posto ${i + 1} antes de registrar.`);
+      const m = A1[i]; if (rig.at !== m.key) return warn('O medidor não está neste posto.');
       const val = num(S.readings[i]); if (!isFinite(val)) return warn('Digite a leitura do visor (ex.: 87,4).');
       const md = rig.slm.mode, [lo, hi] = RANGES_LO_HI(md.range);
       S.regs[m.key] = { val, weight: md.weight, resp: md.resp, max: md.max, cal: md.cal, inRange: m.key && Ls[i] + rig.err >= lo && Ls[i] + rig.err <= hi,
@@ -316,45 +290,40 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
       const ck = panel.querySelector('[data-clock]'); if (ck) ck.textContent = app.fmtClock ? app.fmtClock(app.state.clock) : '';
       const us = panel.querySelector('[data-user]'); if (us) { const u = core.settings.user; us.textContent = `P. Frequência ${u.weighting} · P. Temporal ${u.response === 'F' ? 'Rápida (F)' : 'Lenta (S)'} · Limiar ${u.TL} dB · Critério ${u.CR} dB · Taxa de troca q = ${u.q} dB`; }
     });
-    const offEnd = app.on('workdayEnd', () => { if (cur?.kind === 2) { warn('Fim da jornada: pare a dosimetria (■ por 3 s) e faça a pós-calibração.'); render(); } });
+    const offEnd = app.on('workdayEnd', () => { if (cur?.kind === 2) { warn('Fim da jornada.'); render(); } });
     cur.cleanup = () => { offCal?.(); offFrame?.(); offEnd?.(); app.state.running = false; Object.assign(core.settings.user, userSaved); app.emit('change'); };
     const present = async () => { if (app.state.mounted) return; app.setView('calib', { animate: true, duration: 1.6 }); await app.present(app.dosimeter.group, 'presentDevice', 1.4); };
-    cur.goTab = (t) => { const ch = t !== cur.tab; cur.tab = t; render(); if (ch) orient();
+    cur.goTab = (t) => { cur.tab = t; render();
       if (t === 1 || t === 2 || (t === 4 && !app.state.mounted)) present();
       else if (t === 3) app.setView(app.state.mounted ? 'shoulder' : 'station', { animate: true, duration: 1.6 }); };
     const methodName = () => (S.method === 'NR15' ? 'NR-15, Anexo 1' : S.method === 'NHO01' ? 'NHO-01 (Fundacentro)' : '— escolha na etapa 1 —');
     function render() {
       const t = cur.tab, st = core.state; let body = '';
       const chip = (ok, txt) => `<span class="ativ-chip ${ok ? 'ok' : ''}">${ok ? '✓' : '○'} ${txt}</span>`;
-      if (t === 0) body = `<h3>Escolher a metodologia de avaliação</h3><p class="dz-p">Escolha o critério com que a exposição será avaliada. O dosímetro deve ser configurado de acordo com ele.</p>
-        <div class="ativ-radio"><label><input type="radio" name="met" value="NHO01" ${S.method === 'NHO01' ? 'checked' : ''}> <b>NHO-01</b> (Fundacentro) — avaliação ocupacional, mais protetiva</label>
-        <label><input type="radio" name="met" value="NR15" ${S.method === 'NR15' ? 'checked' : ''}> <b>NR-15, Anexo 1</b> — caracterização de insalubridade</label></div>`;
-      else if (t === 1) body = `<h3>Ligar e calibrar o dosímetro</h3><p class="dz-p">Use as teclas do <b>Visor do dosímetro</b> (pressão longa = segurar 3 s). Para calibrar: retire a espuma, acople o calibrador e use o menu do aparelho.</p>
-        <div class="ativ-act"><div><span>Microfone</span><button class="ui-btn" data-a="foam">${S.foam ? 'Retirar a espuma' : 'Recolocar a espuma'}</button></div>
-          <div><span>Calibrador</span><button class="ui-btn" data-a="couple">${app.state.calibratorCoupled ? 'Desacoplar' : 'Acoplar ao microfone'}</button></div></div>
-        <div class="ativ-chips">${chip(S.poweredOn, 'Dosímetro ligado')}${chip(!S.foam, 'Espuma retirada')}${chip(app.state.calibratorCoupled, 'Calibrador acoplado')}${chip(!!S.cal, S.cal ? `Calibrado em ${S.cal.level} dB` : 'Calibração pelo menu')}</div>
-        <p class="dz-note">Depois de calibrar: desacople o calibrador e recoloque a espuma.</p>`;
-      else if (t === 2) body = `<h3>Configurar o dosímetro — ${methodName()}</h3><p class="dz-p">No menu do aparelho, entre em <b>Ajustes</b> e configure todos os parâmetros de acordo com a metodologia escolhida.</p>
-        <ul class="ativ-list"><li>P. Frequência (ponderação)</li><li>P. Temporal (resposta)</li><li>Nível limiar</li><li>Nível critério</li><li>Taxa de troca (q)</li></ul>
-        <div class="dz-live ativ-user" data-user></div>`;
-      else if (t === 3) body = `<h3>Instalar na trabalhadora e iniciar</h3><p class="dz-p">Instale o dosímetro na trabalhadora com o microfone na zona auditiva, no ombro do lado <b>mais exposto</b> à fonte principal (a prensa à frente dela). Depois inicie a dosimetria pelo aparelho (▶❙❙ por 3 s → Pré calibrar).</p>
+      if (t === 0) body = `<h3>Metodologia de avaliação</h3>
+        <div class="ativ-radio"><label><input type="radio" name="met" value="NHO01" ${S.method === 'NHO01' ? 'checked' : ''}> <b>NHO-01</b> (Fundacentro)</label>
+        <label><input type="radio" name="met" value="NR15" ${S.method === 'NR15' ? 'checked' : ''}> <b>NR-15, Anexo 1</b></label></div>`;
+      else if (t === 1) body = `<h3>Ligar e calibrar o dosímetro</h3>
+        <div class="ativ-act"><div><span>Microfone</span><button class="ui-btn" data-a="foam" ${S.foam ? '' : 'disabled'}>Retirar a espuma</button></div>
+          <div><span>Calibrador</span><button class="ui-btn" data-a="couple">${app.state.calibratorCoupled ? 'Desacoplar' : 'Acoplar ao microfone'}</button></div>
+          <div><span>Microfone</span><button class="ui-btn" data-a="foam" ${S.foam ? 'disabled' : ''}>Recolocar a espuma</button></div></div>`;
+      else if (t === 2) body = `<h3>Configurar o dosímetro</h3>`;
+      else if (t === 3) body = `<h3>Instalar na trabalhadora e medir</h3>
         <div class="ativ-act"><div><span>Instalação</span>${app.state.mounted ? `<b>Instalado no ombro ${S.side === 'L' ? 'esquerdo' : 'direito'}</b>` : '<button class="ui-btn" data-side="L">Ombro esquerdo</button><button class="ui-btn" data-side="R">Ombro direito</button>'}</div>
-          <div><span>Jornada</span>${[60, 240, 960].map((s) => `<button class="ui-btn ${app.state.speed === s ? 'on' : ''}" data-sp="${s}">${s}×</button>`).join('')} <b data-clock></b></div></div>
-        <div class="ativ-chips">${chip(app.state.mounted, 'Instalado')}${chip(!!S.start, 'Dosimetria iniciada')}${chip(S.ended, 'Medição encerrada')}</div>
-        <p class="dz-note">Ao fim da jornada, pare a medição no aparelho (■ por 3 s). A velocidade acelera a jornada simulada.</p>`;
-      else if (t === 4) body = `<h3>Encerrar e pós-calibrar</h3><p class="dz-p">Com a medição parada, o aparelho pede a <b>pós-calibração</b>. Retire o dosímetro da trabalhadora, tire a espuma, acople o calibrador e escolha o nível no aparelho.</p>
+          <div><span>Jornada</span>${[60, 240, 960].map((s) => `<button class="ui-btn ${app.state.speed === s ? 'on' : ''}" data-sp="${s}">${s}×</button>`).join('')} <b data-clock></b></div></div>`;
+      else if (t === 4) body = `<h3>Encerrar e pós-calibrar</h3>
         <div class="ativ-act"><div><span>Dosímetro</span><button class="ui-btn" data-a="unmount" ${app.state.mounted ? '' : 'disabled'}>Retirar da trabalhadora</button></div>
-          <div><span>Microfone</span><button class="ui-btn" data-a="foam">${S.foam ? 'Retirar a espuma' : 'Recolocar a espuma'}</button></div>
-          <div><span>Calibrador</span><button class="ui-btn" data-a="couple">${app.state.calibratorCoupled ? 'Desacoplar' : 'Acoplar ao microfone'}</button></div></div>
-        <div class="ativ-chips">${chip(S.ended, 'Medição parada')}${chip(!!S.post, S.post ? `Pós-calibração: ${f1(S.post.reading)} dB (${S.post.diff >= 0 ? '+' : ''}${f1(S.post.diff)})` : 'Pós-calibração')}</div>`;
+          <div><span>Microfone</span><button class="ui-btn" data-a="foam" ${S.foam ? '' : 'disabled'}>Retirar a espuma</button></div>
+          <div><span>Calibrador</span><button class="ui-btn" data-a="couple">${app.state.calibratorCoupled ? 'Desacoplar' : 'Acoplar ao microfone'}</button></div>
+          <div><span>Microfone</span><button class="ui-btn" data-a="foam" ${S.foam ? 'disabled' : ''}>Recolocar a espuma</button></div></div>`;
       else {
         const nr = S.method === 'NR15', CL = nr ? CLS_NR15 : CLS_NHO;
-        body = `<h3>Parecer técnico — ${methodName()}</h3><p class="dz-p">Leia os resultados no visor do dosímetro (telas de dose e níveis do critério escolhido) e conclua.</p>
-        <div class="ativ-form"><label>Dose (%)<input data-in="dose" inputmode="decimal"></label><label>${nr ? 'NE (Lavg, q = 5) dB(A)' : 'NE (dB(A))'}<input data-in="nivel" inputmode="decimal"></label>${nr ? '' : '<label>NEN (dB(A))<input data-in="nen" inputmode="decimal"></label>'}</div>
-        <h4>A medição é válida? (aferição antes × depois)</h4><div class="ativ-radio row"><label><input type="radio" name="val" data-in="valida" value="sim"> Sim</label><label><input type="radio" name="val" data-in="valida" value="nao"> Não</label></div>
+        body = `<h3>Parecer técnico — ${methodName()}</h3>
+        <div class="ativ-form"><label>Dose (%)<input data-in="dose" inputmode="decimal"></label><label>NE (dB(A))<input data-in="nivel" inputmode="decimal"></label>${nr ? '' : '<label>NEN (dB(A))<input data-in="nen" inputmode="decimal"></label>'}</div>
+        <h4>A medição é válida?</h4><div class="ativ-radio row"><label><input type="radio" name="val" data-in="valida" value="sim"> Sim</label><label><input type="radio" name="val" data-in="valida" value="nao"> Não</label></div>
         <h4>Classificação</h4><div class="ativ-radio">${CL.map((c, i) => `<label><input type="radio" name="cls2" data-in="cls" value="${i}"> ${c}</label>`).join('')}</div>
         <h4>Medidas recomendadas</h4><div class="ativ-check">${MEAS.map(([k, l]) => `<label><input type="checkbox" data-in="meas" value="${k}"> ${l}</label>`).join('')}</div>
-        <label class="ativ-text">Parecer (texto livre)<textarea data-in="texto" rows="3"></textarea></label>`;
+        <label class="ativ-text">Parecer técnico<textarea data-in="texto" rows="3"></textarea></label>`;
       }
       const caseHtml = `<div class="ativ-case"><b>Situação:</b> avaliar a exposição da operadora da prensa durante a jornada com o dosímetro. Metodologia: <b>${methodName()}</b></div>`;
       frame({ title: 'Atividade 2 · Dosímetro', tabs: TABS, tab: t, body, caseHtml });
@@ -366,23 +335,23 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
     }
     async function act(a) {
       if (a === 'foam') {
-        if (S.foam && app.state.mounted) return warn('Retire o dosímetro da trabalhadora antes.');
-        if (!S.foam && app.state.calibratorCoupled) return warn('Desacople o calibrador antes de recolocar a espuma.');
+        if (S.foam && app.state.mounted) return warn('Ação não permitida neste momento.');
+        if (!S.foam && app.state.calibratorCoupled) return warn('Ação não permitida neste momento.');
         S.foam = !S.foam; app.dosimeter?.setWindscreen?.(S.foam);
       } else if (a === 'couple') {
-        if (app.state.mounted) return warn('Retire o dosímetro da trabalhadora antes de acoplar o calibrador.');
-        if (!app.state.calibratorCoupled && S.foam) return warn('Retire a espuma do microfone antes de acoplar o calibrador.');
+        if (app.state.mounted) return warn('Ação não permitida neste momento.');
+        if (!app.state.calibratorCoupled && S.foam) return warn('Ação não permitida neste momento.');
         render(); await fwDo.couple(app, !app.state.calibratorCoupled);
       } else if (a === 'unmount') {
-        if (['run', 'pause', 'countdown'].includes(core.state.mode)) return warn('Pare a medição antes de retirar o aparelho da trabalhadora (NHO-01).');
+        if (['run', 'pause', 'countdown'].includes(core.state.mode)) return warn('Ação não permitida neste momento.');
         app.setView('calib', { animate: true, duration: 1.6 }); await app.present(app.dosimeter.group, 'presentDevice', 1.4); app.state.mounted = false; app.emit('change');
       }
       render();
     }
     async function mount(side) {
-      if (!S.method) return warn('Escolha a metodologia na etapa 1.');
-      if (app.state.calibratorCoupled) return warn('Desacople o calibrador antes de instalar.');
-      if (!S.foam) return warn('Recoloque a espuma no microfone antes de instalar.');
+      if (!S.method) return warn('Etapa 1 não concluída.');
+      if (app.state.calibratorCoupled) return warn('Ação não permitida neste momento.');
+      if (!S.foam) return warn('Ação não permitida neste momento.');
       S.side = side; app.setView('shoulder', { animate: true, duration: 2 }); app.worker?.setActivity?.('olhando');
       await app.mountDosimeter({ side, duration: 1.8 }); setTimeout(() => app.worker?.setActivity?.('operando'), 2500); render();
     }
