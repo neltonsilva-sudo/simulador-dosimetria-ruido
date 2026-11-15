@@ -38,10 +38,32 @@ function measScore(cls, sel, nr15) { // 0..1 — coerência das medidas com a cl
 const A1 = [{ key: 'm1', id: 'prensa1', nome: 'Prensa excêntrica 80 t', Ls: [88, 89, 90, 91, 92] },
   { key: 'm2', id: 'prensa4', nome: 'Prensa hidráulica 150 t', Ls: [83, 84, 85, 86, 87] },
   { key: 'm3', id: 'esmeril1', nome: 'Esmerilhamento (bancada)', Ls: [90, 91, 92, 93, 94] }];
-const A1_TIMES = [[180, 180, 120], [240, 120, 120], [180, 120, 180], [120, 240, 120], [210, 180, 138], [180, 210, 138], [240, 150, 138]];
+const A1_TIMES = [[180, 180, 120], [240, 120, 120], [180, 120, 180], [120, 240, 120], [210, 150, 120], [150, 210, 120], [240, 180, 60], [180, 240, 60]]; // sempre 8 h (480 min)
 const RANGES_LO_HI = (r) => String(r || '30–130').split('–').map(Number);
 
-export function createActivities({ root, app, h, stopVoice, dose, fwDo }) {
+
+// Orientações faladas (voz Francisca gravada por tools/gen_tts.py a partir dos campos `text:` — não mudar sem regenerar)
+const ORIENT = {
+  a1i: { text: 'Atividade prática com o decibelímetro. Você vai avaliar a exposição de um operador que trabalha em três postos durante a jornada. Cumpra as cinco etapas: configurar o medidor, calibrar, medir o ruído das três máquinas, calcular a dose, o NE e o NEN pela NHO-01 e dar o parecer técnico. Cada etapa vale pontos. Quando terminar, clique em Entregar para ver a sua nota.' },
+  a1: [
+    { text: 'Etapa 1, configurar. O decibelímetro veio configurado para outro uso. Use as teclas do visor, no canto esquerdo, para deixá-lo pronto para avaliar a exposição ocupacional a ruído contínuo: escolha o circuito de ponderação na tecla A barra C, a resposta na tecla F barra S, desligue a retenção do máximo e ajuste a faixa de medição na tecla LEVEL, para que o valor não fique fora da escala.' },
+    { text: 'Etapa 2, calibrar. Antes de medir, verifique o medidor com o calibrador acústico. Retire a espuma do microfone, acople o calibrador e ligue-o em 94 ou 114 decibéis. Ligue o modo CAL e use os botões mais e menos até o visor indicar o mesmo valor do calibrador. Depois desligue o CAL, desacople o calibrador e recoloque a espuma.' },
+    { text: 'Etapa 3, medir. Leve o decibelímetro a cada um dos três postos. Com o microfone na zona auditiva, espere a leitura estabilizar, leia o valor no visor do aparelho e registre. Faça isso nas três máquinas.' },
+    { text: 'Etapa 4, calcular. Com os níveis que você registrou e os tempos de exposição de cada posto, calcule o tempo máximo permitido para cada nível, a dose diária, o nível de exposição, NE, e o nível de exposição normalizado, NEN, pela NHO-01. Digite os resultados nos campos.' },
+    { text: 'Etapa 5, parecer técnico. Classifique a exposição de acordo com os critérios da NHO-01, marque as medidas de controle recomendadas e escreva a sua conclusão. Revise as etapas e, quando estiver pronto, clique em Entregar.' },
+  ],
+  a2i: { text: 'Atividade prática com o dosímetro. Você vai avaliar a exposição da operadora da prensa durante a jornada. Cumpra as seis etapas: escolher a metodologia, ligar e calibrar o dosímetro, configurar o aparelho, instalar na trabalhadora e iniciar a medição, encerrar com a pós-calibração e dar o parecer técnico. Ao terminar, clique em Entregar para ver a sua nota.' },
+  a2: [
+    { text: 'Etapa 1, metodologia. Escolha o critério da avaliação: a NHO-01 da Fundacentro, para a avaliação ocupacional, ou o Anexo 1 da NR-15, para caracterizar a insalubridade. O dosímetro deverá ser configurado de acordo com essa escolha.' },
+    { text: 'Etapa 2, ligar e calibrar. Use as teclas do visor do dosímetro; pressão longa é segurar por 3 segundos. Ligue o aparelho, retire a espuma, acople o calibrador e faça a calibração pelo menu, em Dosimetria, Calibrar. Depois desacople o calibrador e recoloque a espuma.' },
+    { text: 'Etapa 3, configurar. Entre no menu do aparelho, em Ajustes, e configure a ponderação de frequência, a ponderação temporal, o nível limiar, o nível critério e a taxa de troca, de acordo com a metodologia escolhida.' },
+    { text: 'Etapa 4, instalar e medir. Instale o dosímetro no ombro do lado mais exposto à fonte de ruído, com o microfone na zona auditiva. Depois inicie a dosimetria pelo aparelho, segurando a tecla iniciar por 3 segundos. Você pode acelerar a jornada. Ao fim, pare a medição segurando a tecla parar por 3 segundos.' },
+    { text: 'Etapa 5, pós-calibrar. Com a medição parada, retire o dosímetro da trabalhadora, tire a espuma, acople o calibrador e escolha o nível no aparelho para fazer a pós-calibração.' },
+    { text: 'Etapa 6, parecer técnico. Leia no visor do dosímetro a dose e os níveis do critério escolhido, informe se a medição é válida, classifique a exposição, marque as medidas recomendadas e escreva a sua conclusão. Depois clique em Entregar.' },
+  ],
+};
+
+export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
   const host = root;
   const THREE = app.stage.THREE;
   let cur = null; // atividade em andamento
@@ -51,6 +73,15 @@ export function createActivities({ root, app, h, stopVoice, dose, fwDo }) {
   let toastT = 0;
   function warn(msg) { toast.textContent = msg; toast.classList.remove('hidden'); clearTimeout(toastT); toastT = setTimeout(() => toast.classList.add('hidden'), 3800); }
   let aluno = ''; try { aluno = localStorage.getItem('ativ.aluno') || ''; } catch {}
+  // orientação falada: toca ao abrir a atividade e ao entrar em cada etapa (🔊 repete, 🔇 silencia)
+  let voz = true; try { voz = localStorage.getItem('ativ.voz') !== '0'; } catch {}
+  let sayTok = 0;
+  function orient(intro) {
+    if (!cur || !say) return; const my = ++sayTok, list = cur.kind === 1 ? ORIENT.a1 : ORIENT.a2, t = list[cur.tab]?.text;
+    if (!voz) { stopVoice?.(); return; }
+    if (intro) say(intro).then(() => { if (my === sayTok && cur && voz) say(list[cur.tab].text); });
+    else if (t) say(t);
+  }
 
   // ── escolha da atividade ──
   function chooser() {
@@ -88,18 +119,21 @@ export function createActivities({ root, app, h, stopVoice, dose, fwDo }) {
     panel.innerHTML = `<div class="dz-h"><span>📝 ${title} · ${esc(aluno)}</span><button class="ui-x dz-x" title="Sair da atividade">✕</button></div>
       ${caseHtml || ''}
       <div class="ativ-tabs">${tabs.map((t, i) => `<button data-t="${i}" class="${i === tab ? 'on' : ''}${cur.done?.[i] ? ' ok' : ''}">${i + 1}. ${t}</button>`).join('')}</div>
+      <div class="ativ-voz"><button class="ui-btn ghost" data-v="ouvir">🔊 Ouvir a orientação</button><button class="ui-btn ghost" data-v="mudo">${voz ? '🔇 Silenciar' : '🔈 Ativar voz'}</button></div>
       <div class="ativ-body">${body}</div>
       <div class="dz-nav"><button class="ui-btn" data-n="prev">◀ Etapa anterior</button><button class="ui-btn" data-n="next">Próxima etapa ▶</button><button class="ui-btn primary" data-n="send">Entregar ✓</button></div>`;
     panel.querySelector('.dz-x').onclick = () => { if (confirm('Sair da atividade? O progresso será perdido.')) exit(); };
     panel.querySelectorAll('.ativ-tabs button').forEach((b) => (b.onclick = () => cur.goTab(+b.dataset.t)));
     panel.querySelector('[data-n="prev"]').onclick = () => cur.goTab(Math.max(0, cur.tab - 1));
     panel.querySelector('[data-n="next"]').onclick = () => cur.goTab(Math.min(tabs.length - 1, cur.tab + 1));
+    panel.querySelector('[data-v="ouvir"]').onclick = () => { if (!voz) { voz = true; try { localStorage.setItem('ativ.voz', '1'); } catch {} cur.rerender?.(); } orient(); };
+    panel.querySelector('[data-v="mudo"]').onclick = () => { voz = !voz; try { localStorage.setItem('ativ.voz', voz ? '1' : '0'); } catch {} if (!voz) stopVoice?.(); else orient(); cur.rerender?.(); };
     panel.querySelector('[data-n="send"]').onclick = () => { if (confirm('Entregar a atividade e ver a nota?')) cur.submit(); };
     panel.classList.remove('hidden');
   }
   function enter(cls) { stopVoice?.(); host.classList.add('ativ-on', cls); modal.classList.add('hidden'); }
   function exit() {
-    if (!cur) return; cur.cleanup?.(); cur = null;
+    if (!cur) return; cur.cleanup?.(); cur = null; sayTok++; stopVoice?.();
     host.classList.remove('ativ-on', 'ativ1', 'ativ2'); panel.classList.add('hidden'); panel.innerHTML = '';
     app.setView('ref', { animate: true, duration: 1.6 });
   }
@@ -144,7 +178,7 @@ export function createActivities({ root, app, h, stopVoice, dose, fwDo }) {
     const camLcd = () => { app.stage.flyTo(rig.spotCam(rig.at || 'm1', true), 1.8); app.stage.setFocus?.(rig.slm.lcdWorld(new THREE.Vector3())); };
     const camSpot = () => { app.stage.flyTo(rig.spotCam(rig.at || 'm1', false), 1.8); app.stage.setFocus?.(null); };
     cur.goTab = (t) => {
-      cur.tab = t; render();
+      const ch = t !== cur.tab; cur.tab = t; render(); if (ch) orient();
       if (t === 1) camHead(); else if (t === 0) camLcd(); else if (t === 2) camSpot();
       else { app.stage.flyTo({ pos: [3.2, 3.6, 4.6], target: [-2.2, 1.0, -5.0], fov: 52 }, 1.8); app.stage.setFocus?.(null); }
     };
@@ -251,7 +285,7 @@ export function createActivities({ root, app, h, stopVoice, dose, fwDo }) {
         Gabarito com os níveis reais: dose ${f1(doseNHO(Ls, Cs))} %, NE ${f1(neFrom(doseNHO(Ls, Cs), TE))} dB(A), NEN ${f1(nenFrom(neFrom(doseNHO(Ls, Cs), TE), TE))} dB(A).</p>
         ${S.ans.texto ? `<p><b>Parecer do aluno:</b> ${esc(S.ans.texto)}</p>` : ''}` });
     };
-    render(); camLcd();
+    cur.rerender = render; render(); camLcd(); orient(ORIENT.a1i.text);
   }
 
   // ════════════════════ ATIVIDADE 2 — DOSÍMETRO ════════════════════
@@ -285,7 +319,7 @@ export function createActivities({ root, app, h, stopVoice, dose, fwDo }) {
     const offEnd = app.on('workdayEnd', () => { if (cur?.kind === 2) { warn('Fim da jornada: pare a dosimetria (■ por 3 s) e faça a pós-calibração.'); render(); } });
     cur.cleanup = () => { offCal?.(); offFrame?.(); offEnd?.(); app.state.running = false; Object.assign(core.settings.user, userSaved); app.emit('change'); };
     const present = async () => { if (app.state.mounted) return; app.setView('calib', { animate: true, duration: 1.6 }); await app.present(app.dosimeter.group, 'presentDevice', 1.4); };
-    cur.goTab = (t) => { cur.tab = t; render();
+    cur.goTab = (t) => { const ch = t !== cur.tab; cur.tab = t; render(); if (ch) orient();
       if (t === 1 || t === 2 || (t === 4 && !app.state.mounted)) present();
       else if (t === 3) app.setView(app.state.mounted ? 'shoulder' : 'station', { animate: true, duration: 1.6 }); };
     const methodName = () => (S.method === 'NR15' ? 'NR-15, Anexo 1' : S.method === 'NHO01' ? 'NHO-01 (Fundacentro)' : '— escolha na etapa 1 —');
@@ -385,7 +419,7 @@ export function createActivities({ root, app, h, stopVoice, dose, fwDo }) {
         extra: `${snap ? `<p><b>Resultado do aparelho (${nr ? 'NR-15' : 'NHO-01'}):</b> dose ${f1(Dr)} %, NE ${f1(NEr)} dB(A)${nr ? '' : `, NEN ${f1(NENr)} dB(A)`}; tempo medido ${hm(Math.round((res.measuredSec || 0) / 60))}.</p>` : '<p>Sem medição registrada.</p>'}
           ${S.ans.texto ? `<p><b>Parecer do aluno:</b> ${esc(S.ans.texto)}</p>` : ''}` });
     };
-    render(); present();
+    cur.rerender = render; render(); present(); orient(ORIENT.a2i.text);
   }
 
   // ── boletim ──
