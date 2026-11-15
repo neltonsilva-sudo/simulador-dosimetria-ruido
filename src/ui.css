@@ -202,3 +202,29 @@
 .ui-slmlcd .sl-keys button { border:0; cursor:pointer; pointer-events:auto; }
 .ui-slmlcd .sl-keys button:hover { filter:brightness(1.15); }
 .ui-slmlcd .sl-keys button:active { transform:translateY(2px); box-shadow:0 0 0 #15181b, inset 0 1px 3px rgba(0,0,0,.5); }
+/* aula da Dose — telas de explicação maiores no computador (pedido do usuário) */
+@media (min-width: 761px) {
+  .ui-dose { width:min(620px, calc(100vw - 32px)); padding:18px 24px 18px; }
+  .ui-dose .dz-h { font-size:13px; }
+  .ui-dose h3 { font-size:24px; margin:8px 0 8px; }
+  .ui-dose .dz-p { font-size:16.5px; line-height:1.5; }
+  .ui-dose .dz-calc { padding:14px 16px; }
+  .ui-dose .eq { font-size:19px; gap:6px; margin:8px 0; }
+  .ui-dose .eq.big { font-size:23px; }
+  .ui-dose .eq small { font-size:14px; }
+  .ui-dose .dz-leg2 { font-size:15px; }
+  .ui-dose .dz-t { font-size:15px; } .ui-dose .dz-t th { font-size:12.5px; } .ui-dose .dz-t td { padding:6px 7px; }
+  .ui-dose .dz-note { font-size:13.5px; }
+  .ui-dose .dz-cards span { font-size:12.5px; } .ui-dose .dz-cards b { font-size:22px; } .ui-dose .dz-cards3 b { font-size:17px; } .ui-dose .dz-cards small { font-size:13px; }
+  .ui-dose .dz-scale { height:19px; font-size:12.5px; } .ui-dose .dz-leg { font-size:14px; }
+  .ui-dose .dz-chips span { font-size:14px; padding:5px 11px; }
+  .ui-dose .dz-verd { font-size:17px; padding:10px; }
+  .ui-dose .dz-med { font-size:15px; }
+  .ui-dose .dz-pass { font-size:14px; } .ui-dose .dz-pass li > span { font-size:12.5px; } .ui-dose .dz-pass .eq { font-size:17px; }
+  .ui-dose .dz-live { font-size:15px; } .ui-dose .dz-live b { font-size:26px; }
+  .ui-dose .dz-keys span { font-size:12.5px; } .ui-dose .dz-keys b { font-size:15.5px; } .ui-dose .dz-keys kbd { font-size:12px; }
+  .ui-dose .dz-nav .ui-btn { padding:10px 16px; font-size:15px; }
+}
+/* botões da aula sempre visíveis (passos longos rolam por baixo) */
+.ui-dose .dz-nav { position:sticky; bottom:-18px; margin:0 -24px -18px; padding:10px 24px 14px; background:linear-gradient(rgba(28,32,38,.0), rgba(28,32,38,.96) 30%); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); z-index:2; }
+@media (max-width: 760px) { .ui-dose .dz-nav { bottom:-14px; margin:0 -18px -14px; padding:8px 18px 12px; } }
