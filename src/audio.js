@@ -5,7 +5,8 @@ import { MACHINES } from './layout_machines.js';
 const GOLPE = typeof location !== 'undefined' && new URLSearchParams(location.search).get('golpe') === '1';
 
 export function createAudio(stage, app) {
-  let ctx = null, master = null, muffle = null, started = false, muted = false;
+  let ctx = null, master = null, muffle = null, started = false, muted = false, bus = null, ducked = false;
+  const DUCK = 0.5; // durante a narração as máquinas/ambiente caem ≈ 6 dB (a voz é um <audio> fora deste grafo)
   let vol = 0.7; try { const v = parseFloat(localStorage.getItem('dosi.vol')); if (v >= 0 && v <= 1) vol = v; } catch {}
   const gainFor = () => (muted ? 0 : 0.8 * vol * vol * 1.4); // curva perceptual (≈ 0,55 em 70 %)
   const voices = {}; let toneOsc = null, toneGain = null;
@@ -29,12 +30,13 @@ export function createAudio(stage, app) {
     muffle = ctx.createBiquadFilter(); muffle.type = 'lowpass'; muffle.frequency.value = 18000;
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
     master.connect(muffle).connect(comp).connect(ctx.destination);
+    bus = ctx.createGain(); bus.gain.value = ducked ? DUCK : 1; bus.connect(master); // barramento do ruído do galpão
     const white = noiseBuffer(2, 'white'), brown = noiseBuffer(3, 'brown');
     // ambiente reverberante do galpão (ruído marrom baixo)
     const amb = loop(brown), ag = ctx.createGain(); ag.gain.value = 0.10; const alp = ctx.createBiquadFilter(); alp.type = 'lowpass'; alp.frequency.value = 400;
-    amb.connect(alp).connect(ag).connect(master);
+    amb.connect(alp).connect(ag).connect(bus);
     for (const m of MACHINES) {
-      const out = ctx.createGain(); out.gain.value = 0; const pn = panner(m.pos); out.connect(pn).connect(master);
+      const out = ctx.createGain(); out.gain.value = 0; const pn = panner(m.pos); out.connect(pn).connect(bus);
       const v = { m, out, level: db(m.Lw) };
       if (m.kind === 'press') { // volante/motor: ronco + harmônico
         const s = loop(brown), f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 220; const g = ctx.createGain(); g.gain.value = 0.5;
@@ -87,6 +89,8 @@ export function createAudio(stage, app) {
     get volume() { return vol; },
     get muted() { return muted; },
     setRunning,
+    /** abaixa um pouco o ruído do galpão enquanto a narração fala */
+    duck(b) { ducked = !!b; if (bus) bus.gain.setTargetAtTime(ducked ? DUCK : 1, ctx.currentTime, ducked ? 0.12 : 0.5); },
     setEarplugs(b) { if (muffle) muffle.frequency.setTargetAtTime(b ? 900 : 18000, ctx.currentTime, 0.1); },
     tone(on, level = 114) {
       if (!ctx) return;

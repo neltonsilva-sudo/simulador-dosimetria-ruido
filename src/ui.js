@@ -74,13 +74,14 @@ export function createUI(root, app) {
   let vozMap = null, curAudio = null;
   fetch('assets/voz/manifest.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null)).then((m) => (vozMap = m)).catch(() => {});
   const fnv = (str) => { let x = 0x811c9dc5; for (const b of new TextEncoder().encode(str)) x = Math.imul(x ^ b, 0x01000193) >>> 0; return x.toString(16).padStart(8, '0'); };
-  function stopVoice() { synthPaused = false; try { speechSynthesis.cancel(); } catch {} if (curAudio) { try { curAudio.pause(); } catch {} curAudio = null; } }
+  const duck = (b) => app.audio?.duck?.(b);
+  function stopVoice() { duck(false); synthPaused = false; try { speechSynthesis.cancel(); } catch {} if (curAudio) { try { curAudio.pause(); } catch {} curAudio = null; } }
   const usingRecorded = () => !!vozMap;
   // pausa/retomada da narração (aula da Dose): pauseVoice() congela o áudio; resumeVoice() continua e resolve ao terminar
   let synthPaused = false;
   function pauseVoice() {
     if (curAudio && !curAudio.paused && !curAudio.ended) { try { curAudio.pause(); } catch {} return true; }
-    try { if (speechSynthesis.speaking && !speechSynthesis.paused) { speechSynthesis.pause(); synthPaused = true; return true; } } catch {}
+    try { if (speechSynthesis.speaking && !speechSynthesis.paused) { speechSynthesis.pause(); synthPaused = true; duck(false); return true; } } catch {}
     return false;
   }
   function resumeVoice() {
@@ -94,9 +95,9 @@ export function createUI(root, app) {
         a.play().catch(fin); return;
       }
       if (synthPaused) {
-        synthPaused = false; try { speechSynthesis.resume(); } catch {}
+        synthPaused = false; duck(true); try { speechSynthesis.resume(); } catch {}
         const t0 = performance.now();
-        const poll = () => { let sp = false; try { sp = speechSynthesis.speaking; } catch {} if (!sp || performance.now() - t0 > 30000) res(true); else setTimeout(poll, 250); };
+        const poll = () => { let sp = false; try { sp = speechSynthesis.speaking; } catch {} if (!sp || performance.now() - t0 > 30000) { duck(false); res(true); } else setTimeout(poll, 250); };
         return void setTimeout(poll, 300);
       }
       res(false);
@@ -111,12 +112,14 @@ export function createUI(root, app) {
       const synth = () => {
         if (!voiceOn || !window.speechSynthesis) return setTimeout(fin, Math.min(9000, 1200 + clean.length * 45));
         const u = new SpeechSynthesisUtterance(spoken); u.lang = 'pt-BR'; if (voice) u.voice = voice; u.rate = voice && /francisca/i.test(voice.name) ? 1.0 : 1.05; u.volume = Math.min(1, voiceVol() * 1.2);
-        u.onend = fin; u.onerror = fin; setTimeout(fin, 2500 + clean.length * 90); speechSynthesis.speak(u);
+        u.onstart = () => duck(true); u.onend = () => { duck(false); fin(); }; u.onerror = () => { duck(false); fin(); }; setTimeout(fin, 2500 + clean.length * 90); speechSynthesis.speak(u);
       };
       const file = vozMap?.[fnv(clean)];
       if (voiceOn && file) {
         const a = new Audio('assets/voz/' + file); curAudio = a; a.preload = 'auto'; a.volume = Math.min(1, voiceVol() * 1.2);
         a.onended = fin; a.onerror = () => { if (curAudio === a) { curAudio = null; synth(); } };
+        // ruído do galpão um pouco mais baixo só enquanto a voz toca (pausa/fim/troca devolvem o volume)
+        a.addEventListener('playing', () => { if (curAudio === a) duck(true); }); a.addEventListener('pause', () => { if (curAudio === a) duck(false); }); a.addEventListener('ended', () => { if (curAudio === a || !curAudio) duck(false); });
         setTimeout(fin, 4000 + clean.length * 110);
         a.play().catch(() => { if (curAudio === a) { curAudio = null; synth(); } });
         return;
