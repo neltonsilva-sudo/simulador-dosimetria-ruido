@@ -1,6 +1,8 @@
 // Áudio procedural espacializado (WebAudio + PannerNode HRTF) — dono: ÁUDIO.
-// Sem arquivos: ruídos sintetizados. Golpe da prensa em machines.onStroke; tom de 1 kHz do calibrador; bipes do dosímetro.
+// Sem arquivos: ruídos sintetizados. Prensas com ruído contínuo (golpe opcional com ?golpe=1); tom de 1 kHz do calibrador; bipes do dosímetro.
 import { MACHINES } from './layout_machines.js';
+// Prensas com ruído CONTÍNUO (pedido do usuário: sem o som de batida). ?golpe=1 volta os golpes de impacto.
+const GOLPE = typeof location !== 'undefined' && new URLSearchParams(location.search).get('golpe') === '1';
 
 export function createAudio(stage, app) {
   let ctx = null, master = null, muffle = null, started = false, muted = false;
@@ -39,7 +41,14 @@ export function createAudio(stage, app) {
         s.connect(f).connect(g).connect(out);
         const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 29 + Math.random() * 4; const og = ctx.createGain(); og.gain.value = 0.05; const of = ctx.createBiquadFilter(); of.type = 'lowpass'; of.frequency.value = 160;
         o.connect(of).connect(og).connect(out); o.start();
-        v.hit = () => { // golpe: transiente metálico + baque grave
+        // ruído contínuo de máquina em operação (sem batidas): banda larga mecânica + chiado do acionamento + zumbido do motor
+        const mb = loop(white), mh = ctx.createBiquadFilter(); mh.type = 'highpass'; mh.frequency.value = 280; const ml = ctx.createBiquadFilter(); ml.type = 'lowpass'; ml.frequency.value = 2600;
+        const mg = ctx.createGain(); mg.gain.value = 0.32; mb.connect(mh).connect(ml).connect(mg).connect(out);
+        const wh = ctx.createOscillator(); wh.type = 'triangle'; wh.frequency.value = 410 + Math.random() * 70; const wf = ctx.createBiquadFilter(); wf.type = 'bandpass'; wf.frequency.value = wh.frequency.value; wf.Q.value = 6;
+        const wg = ctx.createGain(); wg.gain.value = 0.035; wh.connect(wf).connect(wg).connect(out); wh.start();
+        const hum = ctx.createOscillator(); hum.frequency.value = 120; const hg = ctx.createGain(); hg.gain.value = 0.06; hum.connect(hg).connect(out); hum.start();
+        const lfo = ctx.createOscillator(); lfo.frequency.value = 0.4 + Math.random() * 0.3; const lg = ctx.createGain(); lg.gain.value = 0.05; lfo.connect(lg).connect(mg.gain); lfo.start(); // leve flutuação (rotação), sem impactos
+        if (GOLPE) v.hit = () => { // golpe: transiente metálico + baque grave
           const t = ctx.currentTime, s2 = ctx.createBufferSource(); s2.buffer = white; const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1800 + Math.random() * 900; bp.Q.value = 1.4;
           const g2 = ctx.createGain(); g2.gain.setValueAtTime(1.6, t); g2.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
           s2.connect(bp).connect(g2).connect(out); s2.start(t, Math.random()); s2.stop(t + 0.4);
