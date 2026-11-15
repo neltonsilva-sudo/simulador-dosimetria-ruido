@@ -226,9 +226,9 @@ export function buildSLM(THREE) {
   }
 
   // ── estado do aparelho e LCD ──
-  const mode = { power: true, weight: 'A', resp: 'S', max: false, cal: false };
+  const mode = { power: true, weight: 'A', resp: 'S', max: false, cal: false, range: '30–130' }; // range: faixa da tecla LEVEL
   let reading = 0, target = 0, shown = '', redrawT = 0, bootT = 0, maxHold = 0, dirty = true, hiKey = null, hiT = 0;
-  const lcdState = () => ({ val: mode.max ? Math.max(maxHold, reading) : reading, power: mode.power, boot: bootT > 0, weight: mode.weight, resp: mode.resp, max: mode.max, cal: mode.cal });
+  const lcdState = () => ({ val: mode.max ? Math.max(maxHold, reading) : reading, power: mode.power, boot: bootT > 0, weight: mode.weight, resp: mode.resp, max: mode.max, cal: mode.cal, range: mode.range });
   let lcdRev = 0; // conta redesenhos do LCD (o painel da interface copia o canvas só quando muda)
   const drawLCD = () => { LCD.draw(lcdState()); shown = lcdState().val.toFixed(1); dirty = false; lcdRev++; };
   drawLCD();
@@ -252,6 +252,7 @@ export function buildSLM(THREE) {
       if (o.resp === 'F' || o.resp === 'S') mode.resp = o.resp;
       if (o.max !== undefined) { mode.max = !!o.max; maxHold = mode.max ? reading : 0; }
       if (o.cal !== undefined) mode.cal = !!o.cal;
+      if (typeof o.range === 'string') mode.range = o.range;
       dirty = true;
     },
     /** afunda a tecla ≈ 0,6 mm e solta em ≈ 0,25 s: 'power' | 'fs' | 'ac' | 'maxmin' | 'level' */

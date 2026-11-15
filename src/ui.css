@@ -190,12 +190,15 @@
 .ui-slmlcd canvas { display:block; width:256px; height:240px; border-radius:8px; background:#a5af98; box-shadow: inset 0 0 0 2px #111, 0 0 0 3px #2a2d31; }
 .ui-slmlcd .sl-info { margin:8px 2px 6px; font-size:12px; color:#c9d1d9; }
 .ui-slmlcd .sl-keys { display:flex; gap:5px; flex-wrap:wrap; }
-.ui-slmlcd .sl-keys span { flex:1; min-width:34px; padding:6px 4px; border-radius:8px; text-align:center; font:700 10.5px/1 'Roboto Condensed',system-ui,sans-serif; color:#d9dee3;
+.ui-slmlcd .sl-keys button { flex:1; min-width:34px; padding:6px 4px; border-radius:8px; text-align:center; font:700 10.5px/1 'Roboto Condensed',system-ui,sans-serif; color:#d9dee3;
   background:linear-gradient(#4a5058,#2c3137); box-shadow:0 2px 0 #15181b, inset 0 1px 0 rgba(255,255,255,.16); transition:box-shadow .25s, background .25s, transform .12s; }
-.ui-slmlcd .sl-keys span.pw { color:#9fd0ff; font-size:13px; }
-.ui-slmlcd .sl-keys span.on { background:linear-gradient(#3b8be0,#1d5fae); color:#fff; box-shadow:0 0 0 2px rgba(120,190,255,.6), 0 0 14px rgba(80,160,255,.55); transform:translateY(1px); }
+.ui-slmlcd .sl-keys button.pw { color:#9fd0ff; font-size:13px; }
+.ui-slmlcd .sl-keys button.on { background:linear-gradient(#3b8be0,#1d5fae); color:#fff; box-shadow:0 0 0 2px rgba(120,190,255,.6), 0 0 14px rgba(80,160,255,.55); transform:translateY(1px); }
 @media (max-width: 760px) { .ui-slmlcd { transform:scale(.62); transform-origin:top left; left:8px; top:8px; } }
 /* aula da Dose — títulos e fórmulas em amarelo (pedido do usuário) */
 .ui-dose h3 { color:#ffd54f; }
 .ui-dose .eq, .ui-dose .eq b { color:#ffd54f; }
 .ui-dose .eq small { color:#c9b46a; }
+.ui-slmlcd .sl-keys button { border:0; cursor:pointer; pointer-events:auto; }
+.ui-slmlcd .sl-keys button:hover { filter:brightness(1.15); }
+.ui-slmlcd .sl-keys button:active { transform:translateY(2px); box-shadow:0 0 0 #15181b, inset 0 1px 3px rgba(0,0,0,.5); }

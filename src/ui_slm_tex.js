@@ -267,8 +267,10 @@ export function makeLCD(THREE) {
       lx.textAlign = 'left';
     });
     const F2 = `700 15px ${FONT}`;
-    txt('OVER', 18, 284, v > 130, F2); txt('UNDER', 64, 284, v < 30 && v > 0, F2); txt('HOLD', 122, 284, false, F2); txt('AUTO', 168, 284, false, F2);
-    txt('30–130', 238, 284, true, F2);
+    // faixa da tecla LEVEL: OVER/UNDER acendem quando a leitura sai da faixa escolhida
+    const rg = String(st.range || '30–130'), [lo, hi] = rg.split('–').map(Number);
+    txt('OVER', 18, 284, v > hi, F2); txt('UNDER', 64, 284, v < lo && v > 0, F2); txt('HOLD', 122, 284, false, F2); txt('AUTO', 168, 284, false, F2);
+    lx.textAlign = 'right'; txt(rg, 300, 284, true, F2); lx.textAlign = 'left';
   }
   function draw(st) {
     lx.setTransform(1, 0, 0, 1, 0, 0); lx.filter = 'none'; lx.drawImage(bc, 0, 0);

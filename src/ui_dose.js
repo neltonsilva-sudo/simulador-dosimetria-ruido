@@ -13,7 +13,7 @@ export const DOSE_CASE = [
   { id: 'prensa4', n: 2, nome: 'Prensa hidráulica 150 t', L: 85, h: 4, color: '#ffca28', labelY: 3.6 },
 ];
 // pontos de medição com o decibelímetro (tripé no piso, microfone na altura do ouvido voltado para a máquina)
-const SPOTS = { m1: { pos: [-0.87, -0.62], src: [-1.3, -1.95], L: 90 }, m2: { pos: [-5.24, -1.92], src: [-6.8, -4.0], L: 85 } };
+const SPOTS = { m1: { pos: [-0.87, -0.62], src: [-1.3, -1.95], L: 90, dC: 2.6 }, m2: { pos: [-5.24, -1.92], src: [-6.8, -4.0], L: 85, dC: 3.8 } }; // dC: L(C) − L(A) — prensas têm energia em baixa frequência
 const C1 = DOSE_CASE[0].h * 60, C2 = DOSE_CASE[1].h * 60;
 const T1 = allowedMinutes(DOSE_CASE[0].L, CRITERIA.NHO01), T2 = allowedMinutes(DOSE_CASE[1].L, CRITERIA.NHO01);
 const d1 = C1 / T1, d2 = C2 / T2, D = (d1 + d2) * 100;
@@ -172,6 +172,11 @@ export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = ()
 
   // ── decibelímetro no tripé ──
   const slm = buildSLM(THREE); app.stage.scene.add(slm.group); let slmAt = null;
+  // nível-alvo na ponderação escolhida: em C a prensa lê mais alto (baixas frequências); o tom de 1 kHz do calibrador é igual em A e C
+  let baseL = 0; const setRaw = slm.setTarget.bind(slm);
+  const levelFor = (L) => L + (slm.mode.weight === 'C' && !slm.mode.cal && slmAt && Math.abs(L - SPOTS[slmAt].L) < 0.01 ? SPOTS[slmAt].dC : 0);
+  slm.setTarget = (L) => { baseL = L; setRaw(levelFor(L)); };
+  const retarget = () => { if (baseL) setRaw(levelFor(baseL)); };
   const tmpV = new THREE.Vector3();
   function spotCam(key, close) {
     const sp = SPOTS[key]; const bx = sp.pos[0] - sp.src[0], bz = sp.pos[1] - sp.src[1], bl = Math.hypot(bx, bz), b = [bx / bl, bz / bl], sd = [-b[1], b[0]];
@@ -230,7 +235,7 @@ export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = ()
   const CPS = 14.2; // caracteres por segundo da voz gravada (Francisca, medido nos MP3)
   function resetRig() {
     calRelease(); slm.highlight?.(null); slm.setWindscreen?.(true);
-    slm.setMode?.({ power: true, weight: 'A', resp: 'S', max: false, cal: false });
+    slm.setMode?.({ power: true, weight: 'A', resp: 'S', max: false, cal: false, range: '30–130' });
   }
 
   // ── marcadores 3D: anéis de ruído no piso (ondas) ──
@@ -281,7 +286,20 @@ export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = ()
   const slmCv = h('canvas'); slmCv.width = Math.round(256 * LDPR); slmCv.height = Math.round(240 * LDPR); slmPanel.appendChild(slmCv);
   const slmCtx = slmCv.getContext('2d');
   const slmInfo = h('div', 'sl-info', ''); slmPanel.appendChild(slmInfo);
-  const slmKeys = h('div', 'sl-keys', SLM_KEYS.map(([k, t, c]) => `<span data-sk="${k}" class="${c || ''}">${t}</span>`).join('')); slmPanel.appendChild(slmKeys);
+  const SLM_TIPS = { power: 'Liga/desliga', fs: 'Resposta: rápida (FAST) / lenta (SLOW)', ac: 'Ponderação A / C', maxmin: 'Retenção do valor máximo (MAX)', level: 'Faixa de medição' };
+  const slmKeys = h('div', 'sl-keys', SLM_KEYS.map(([k, t, c]) => `<button type="button" data-sk="${k}" class="${c || ''}" title="${SLM_TIPS[k]}">${t}</button>`).join('')); slmPanel.appendChild(slmKeys);
+  // teclas funcionais: mesmo efeito da tecla do aparelho na cena (afunda, bipa e muda o modo/visor)
+  const RANGES = ['30–130', '30–80', '50–100', '60–110', '80–130'];
+  function slmKey(k) {
+    const m = slm.mode; slm.press?.(k); app.audio?.beep?.('key');
+    if (k === 'power') { slm.setMode({ power: !m.power }); if (!m.power) retarget(); return; }
+    if (!m.power) return;
+    if (k === 'fs') slm.setMode({ resp: m.resp === 'S' ? 'F' : 'S' });
+    else if (k === 'ac') { slm.setMode({ weight: m.weight === 'A' ? 'C' : 'A' }); retarget(); }
+    else if (k === 'maxmin') slm.setMode({ max: !m.max });
+    else if (k === 'level') slm.setMode({ range: RANGES[(RANGES.indexOf(m.range) + 1) % RANGES.length] });
+  }
+  slmKeys.querySelectorAll('[data-sk]').forEach((b) => (b.onclick = () => slmKey(b.dataset.sk)));
   host.appendChild(slmPanel);
   let slmRev = -1, slmHi = undefined, slmInfoTxt = '';
   function drawSlmPanel() {
@@ -294,7 +312,7 @@ export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = ()
     }
     const hi = slm.highlighted ?? null;
     if (hi !== slmHi) { slmHi = hi; slmKeys.querySelectorAll('[data-sk]').forEach((e) => e.classList.toggle('on', e.dataset.sk === hi)); }
-    const m = slm.mode || {}, info = !m.power ? 'Desligado' : `Ponderação ${m.weight || 'A'} · resposta ${m.resp === 'F' ? 'rápida (FAST)' : 'lenta (SLOW)'}${m.max ? ' · MAX' : ''}${m.cal ? ' · CAL' : ''}`;
+    const m = slm.mode || {}, info = !m.power ? 'Desligado' : `Ponderação ${m.weight || 'A'} · resposta ${m.resp === 'F' ? 'rápida (FAST)' : 'lenta (SLOW)'}${m.max ? ' · MAX' : ''}${m.cal ? ' · CAL' : ''} · faixa ${m.range || '30–130'} dB`;
     if (info !== slmInfoTxt) { slmInfoTxt = info; slmInfo.textContent = info; }
   }
   function paint() {
