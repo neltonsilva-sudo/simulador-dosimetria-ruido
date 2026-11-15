@@ -117,6 +117,7 @@ export function buildHair({ THREE, add, recs, skin, hw, zB, zF, T, ear, rimY, R,
   // ── guias da cascata ──
   const HAIR_K = +(new URLSearchParams(location.search).get('hlen') || 0.45); // comprimento (1 = abaixo das escápulas; 0,6 = ombros; 0,45 = acima dos ombros)
   const NG = 190;
+  const JUNTO = +(new URLSearchParams(location.search).get('hjunto') ?? 1); // 1 = cabelo mais junto (mechas convergem para a nuca); 0 = volume solto antigo
   for (let gI = 0; gI < NG; gI++) {
     const side = R() < 0.5 ? -1 : 1, spread = Math.pow(R(), 0.8);
     const a = side * (Math.PI - spread * (Math.PI - 1.8)); // 103°..180° (atrás da orelha até a nuca)
@@ -124,10 +125,11 @@ export function buildHair({ THREE, add, recs, skin, hw, zB, zF, T, ear, rimY, R,
     const y = yBot + (yTop - yBot) * Math.pow(R(), 0.7);
     let p = onSkull(a, y, 0.006);
     const out = V3(Math.sin(a), 0, Math.cos(a));
-    let d = out.clone().multiplyScalar(0.55 + R() * 0.3).add(V3(0, -0.85, 0)).normalize();
+    let d = out.clone().multiplyScalar(JUNTO ? 0.18 + R() * 0.12 : 0.55 + R() * 0.3).add(V3(0, -0.85, 0)).normalize();
     const Lg = (0.12 + R() * 0.13 + (1 - spread) * 0.05) * HAIR_K, step = 0.012, pts = [p.clone()];
     for (let s = 0; s * step < Lg; s++) {
-      d.add(V3(0, -0.11, 0)).add(out.clone().multiplyScalar(p.y > -0.12 ? 0.1 : -0.01)).add(V3(side < 0 && p.y > -0.2 ? -0.05 : 0, 0, 0)).add(V3((R() - 0.5) * 0.06, 0, (R() - 0.5) * 0.06)).normalize();
+      if (JUNTO) d.add(V3(0, -0.11, 0)).add(out.clone().multiplyScalar(p.y > -0.1 ? 0.03 : -0.05)).add(V3(-p.x * 0.9, 0, (zc - 0.07 - p.z) * 0.5)).add(V3((R() - 0.5) * 0.03, 0, (R() - 0.5) * 0.03)).normalize(); // converge para a nuca
+      else d.add(V3(0, -0.11, 0)).add(out.clone().multiplyScalar(p.y > -0.12 ? 0.1 : -0.01)).add(V3(side < 0 && p.y > -0.2 ? -0.05 : 0, 0, 0)).add(V3((R() - 0.5) * 0.06, 0, (R() - 0.5) * 0.06)).normalize();
       p = p.clone().addScaledVector(d, step);
       const hr = Math.hypot(p.x, p.z - zc), sk = skullR(Math.atan2(p.x, p.z - zc), p.y);
       if (p.y > -0.11 && hr < sk + 0.008) { const k = (sk + 0.008) / hr; p.x *= k; p.z = zc + (p.z - zc) * k; }
@@ -137,10 +139,10 @@ export function buildHair({ THREE, add, recs, skin, hw, zB, zF, T, ear, rimY, R,
     // cachos ao longo da guia
     let acc = 0, i = 0; const light = Math.pow(R(), 1.6);
     while (i < pts.length - 1) {
-      const sc = 0.75 + R() * 0.45, segL = 0.075 * sc; const a0 = pts[i];
+      const sc = (0.75 + R() * 0.45) * (JUNTO ? 0.88 : 1), segL = 0.075 * sc; const a0 = pts[i];
       let j = i; while (j < pts.length - 1 && pts[j].distanceTo(a0) < segL) j++;
-      const dir = pts[j].clone().sub(a0); if (dir.lengthSq() < 1e-8) break; dir.normalize().add(V3((R() - 0.5) * 0.7, (R() - 0.5) * 0.3, (R() - 0.5) * 0.7));
-      const jit = V3((R() - 0.5) * 0.01, 0, (R() - 0.5) * 0.01);
+      const dir = pts[j].clone().sub(a0); if (dir.lengthSq() < 1e-8) break; const J = JUNTO ? 0.38 : 0.7; dir.normalize().add(V3((R() - 0.5) * J, (R() - 0.5) * 0.3, (R() - 0.5) * J));
+      const jit = V3((R() - 0.5) * 0.01, 0, (R() - 0.5) * 0.01).multiplyScalar(JUNTO ? 0.5 : 1);
       put(a0.clone().add(jit), dir, sc * (acc === 0 ? 0.8 : 1), light * (0.6 + 0.4 * acc / Lg) + (acc / Lg) * 0.25);
       acc += segL; i = j === i ? i + 1 : j;
     }
@@ -215,10 +217,11 @@ export function buildHair({ THREE, add, recs, skin, hw, zB, zF, T, ear, rimY, R,
     const wisp = (p, d, L) => { let c = p.clone(); const k0 = R() * 6; const l = 0.5 + R() * 0.6;
       for (let j = 0; j < 7; j++) { const n = c.clone().addScaledVector(d, L / 7).add(V3(Math.sin(k0 + j * 2.1), Math.cos(k0 + j * 1.7), Math.sin(k0 + j * 2.7)).multiplyScalar(0.0022));
         fp.push(c.x, c.y, c.z, n.x, n.y, n.z); for (let q = 0; q < 2; q++) fc.push(0.4 * l, 0.25 * l, 0.14 * l); c = n; } };
-    for (let i = 0; i < 70; i++) { const s = R() < 0.5 ? -1 : 1, a = s * (1.9 + R() * 1.2), y = ear[s].c.y + 0.04 - R() * 0.12;
+    const JW = +(new URLSearchParams(location.search).get('hjunto') ?? 1);
+    for (let i = 0; i < (JW ? 30 : 70); i++) { const s = R() < 0.5 ? -1 : 1, a = s * (1.9 + R() * 1.2), y = ear[s].c.y + 0.04 - R() * 0.12;
       wisp(onSkull(a, y, 0.006), V3(Math.sin(a) * 0.5 + (R() - 0.5), -0.6 - R(), Math.cos(a) * 0.5 + (R() - 0.5)).normalize(), 0.015 + R() * 0.035); }
-    for (let i = 0; i < 700; i++) { const it = placed[Math.floor(R() * placed.length)]; const p = it.p.clone().add(pivot);
-      wisp(p, V3((R() - 0.5), -0.4 - R(), (R() - 0.5)).normalize(), 0.012 + R() * 0.03); }
+    for (let i = 0; i < (JW ? 260 : 700); i++) { const it = placed[Math.floor(R() * placed.length)]; const p = it.p.clone().add(pivot);
+      wisp(p, V3((R() - 0.5), -0.4 - R(), (R() - 0.5)).normalize(), (0.012 + R() * 0.03) * (JW ? 0.6 : 1)); }
     const fg = new THREE.BufferGeometry(); fg.setAttribute('position', new THREE.Float32BufferAttribute(fp, 3)); fg.setAttribute('color', new THREE.Float32BufferAttribute(fc, 3));
     const frizz = new THREE.LineSegments(fg, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.32, depthWrite: false }));
     frizz.frustumCulled = false; frizz.userData.noBloom = true; group.add(frizz);
