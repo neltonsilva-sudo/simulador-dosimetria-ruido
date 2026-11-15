@@ -7,7 +7,8 @@ export const CAMS = {
   // prensa grande atrás à esquerda, galpão profundo ao centro, claraboias no alto à direita.
   ref: { pos: [0.34, 1.34, 1.6], target: [0.2, 1.37, -0.03], fov: 32, focus: [0.08, 1.6, 0.06], dof: 0.42 },
   overview: { pos: [8.2, 5.6, 5.8], target: [-3.5, 1.0, -7.5], fov: 52, dof: 0 },
-  station: { pos: [2.1, 1.65, 2.6], target: [-0.1, 1.15, -0.2], fov: 40, focus: [0.1, 1.3, 0.0], dof: 0.15 },
+  // posto: trabalhadora de corpo inteiro no painel CNC, prensa do posto ao fundo (câmera do lado da prensa, fora da lateral alta do painel)
+  station: { pos: [-1.4, 1.8, 2.6], target: [0.2, 1.1, -0.2], fov: 44, focus: [0.0, 1.3, 0.0], dof: 0.12 },
   // close-up do ombro ESQUERDO (lado da prensa = lado mais exposto) para mostrar o dosímetro instalado
   // (enquadra aparelho + orelha/capacete; foco entre microfone e orelha, fundo desfocado)
   shoulder: { pos: [0.5, 1.2, 0.74], target: [0.15, 1.41, -0.03], fov: 34, focus: [0.2, 1.33, -0.02], dof: 0.5 },
