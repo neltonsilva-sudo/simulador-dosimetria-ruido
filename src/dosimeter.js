@@ -158,12 +158,12 @@ export function buildDosimeter(stage, fw, app) {
   const keyMat = tpeMat(0x2a90ea, 0.48); keyMat.sheen = 0.55; keyMat.vertexColors = false;
   const icoMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.28, roughness: 0.55, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }); // tinta branca viva (como as teclas do painel)
   const keyGeo = extrudeSmooth(roundRectArc(8.6, 8.4, 1.8), 2.4, { bt: 0.55, bs: 0.6, seg: 6 }); // tampo plano e borda definida
-  const keys = {}, keyOutline = {}, keyRest = {};
+  const keys = {}, keyOutline = {}, keyRest = {}, holdRing = {}; // holdRing: anel de progresso da pressão longa (como o painel)
   ['power', 'play', 'stop', 'menu'].forEach((k, i) => {
     const m = add(keyGeo, keyMat); m.position.set(-15.75 + i * 10.5, -25.2, FRONT + 0.85); m.name = 'tecla_' + k; m.userData.key = k;
     const ig = new THREE.ExtrudeGeometry(iconShapes(k, 1.0), { depth: 0.04, bevelEnabled: false, curveSegments: 16 });
     const ic = new THREE.Mesh(ig, icoMat); ic.position.z = 1.2; ic.userData.key = k; m.add(ic);
-    keys[k] = m; keyRest[k] = m.position.z; keyOutline[k] = keyRing(m);
+    keys[k] = m; keyRest[k] = m.position.z; keyOutline[k] = keyRing(m); holdRing[k] = keyRing(m); holdRing[k].userData.p = 0;
   });
   // ── LED (canto superior direito da moldura, item 6 do manual) ──
   const ledMat = new THREE.MeshPhysicalMaterial({ color: 0x1a1210, roughness: 0.08, clearcoat: 1, emissive: 0x000000, emissiveIntensity: 3, toneMapped: false });
@@ -288,6 +288,20 @@ export function buildDosimeter(stage, fw, app) {
     const now = performance.now();
     for (const h of held.values()) if (!h.fired && now - h.t0 >= 3000) {
       h.fired = true; if (h.key === 'power+menu') for (const o of held.values()) if (o.key === 'power+menu') o.fired = true; fire(h.key, 3000); }
+    // anel de progresso ao segurar a tecla 3D (enche em 3 s; verde quando dispara) — mesmo retorno visual das teclas do painel
+    for (const k in holdRing) {
+      let p = -1, fired = false;
+      for (const h of held.values()) if (h.key === k || (h.key === 'power+menu' && (k === 'power' || k === 'menu'))) { p = Math.max(p, Math.min(1, (now - h.t0) / 3000)); fired = fired || h.fired; }
+      const R = holdRing[k], [tr, halo] = R.children;
+      if (p >= 0) { R.userData.p = p; R.userData.fade = 1; R.visible = true; }
+      else if (R.visible) { R.userData.fade -= dt * 4; if (R.userData.fade <= 0) R.visible = false; }
+      if (R.visible) {
+        const q = R.userData.p, f = Math.max(0, R.userData.fade);
+        tr.material.color.setHex(fired || q >= 1 ? 0x3fd08a : 0x5aa4ff).lerp(new THREE.Color(fired || q >= 1 ? 0x3fd08a : 0xffd54a), fired ? 0 : q).multiplyScalar(2.2);
+        tr.material.opacity = (0.35 + 0.65 * q) * f; halo.material.opacity = 0.45 * q * f;
+        const sc = 1 + 0.06 * q; R.scale.set(sc, sc, 1);
+      }
+    }
     for (const k in press) {
       if (pulses[k] > 0) pulses[k] -= dt;
       const down = holding(k) || holding('power+menu') && (k === 'power' || k === 'menu') || pulses[k] > 0;

@@ -280,3 +280,6 @@
 .ativ-modo label { display:flex; gap:8px; align-items:center; padding:9px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.05); color:#dfe4e9; font-size:13.5px; cursor:pointer; }
 .ativ-modo label:has(input:checked) { border-color:#5aa4ff; background:rgba(90,164,255,.16); } .ativ-modo input { accent-color:#2f8cff; }
 .ativ-guia { margin:0 0 10px; padding:10px 12px; border-radius:10px; background:rgba(255,213,79,.10); border:1px solid rgba(255,213,79,.35); color:#f3e3a6; font-size:14px; line-height:1.5; }
+
+/* títulos dos passos da demonstração em amarelo */
+.ui-cap-h b { color:#ffd54f; }
