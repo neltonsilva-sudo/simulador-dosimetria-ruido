@@ -2,6 +2,7 @@
 // Pintura industrial sobre ferro fundido: lascas mostrando metal, ferrugem com escorrimento, óleo, graxa, riscos,
 // poeira em superfícies horizontais (shader, pela normal do mundo), sujeira junto ao piso, bordas gastas (atributo aEdge).
 import * as THREE from 'three';
+export const CLEAN = (() => { try { return new URLSearchParams(location.search).get('sujo') !== '1'; } catch { return true; } })(); // galpão limpo e organizado (5S); ?sujo=1 volta ao aspecto antigo
 
 // ───────────────────────── ruído tileável ─────────────────────────
 function rng(seed) { let s = seed >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
@@ -124,13 +125,14 @@ const hex = (h) => [((h >> 16) & 255) / 255, ((h >> 8) & 255) / 255, (h & 255) /
 function paintAlbedo(scheme) {
   const M = paintMasks || buildPaintMasks(), N = M.N;
   const P = hex(scheme.paint), G = hex(scheme.grime ?? 0x2a2a22), metal = [0.33, 0.33, 0.34], rustC = [0.42, 0.22, 0.10], rustD = [0.22, 0.11, 0.05];
-  const primer = hex(scheme.primer ?? 0x8a5a44), wear = scheme.wear ?? 1, oilK = scheme.oil ?? 1;
+  const CK = CLEAN ? 0.18 : 1; // manutenção em dia: pintura conservada
+  const primer = hex(scheme.primer ?? 0x8a5a44), wear = (scheme.wear ?? 1) * CK, oilK = (scheme.oil ?? 1) * CK;
   const c = canvas(N), ctx = c.getContext('2d'), img = ctx.createImageData(N, N), d = img.data;
   for (let i = 0; i < N * N; i++) {
     const mv = 0.84 + (M.mott[i] - 0.5) * 0.42;
     let r = P[0] * mv, g = P[1] * mv, b = P[2] * mv;
     // sujeira/graxa em manchas
-    const gk = sst(0.5, 0.8, M.grime[i]) * 0.55 * (scheme.dirt ?? 1);
+    const gk = sst(0.5, 0.8, M.grime[i]) * 0.55 * (scheme.dirt ?? 1) * CK;
     r += (G[0] - r) * gk; g += (G[1] - g) * gk; b += (G[2] - b) * gk;
     // escorrimento de óleo (escurece, leve tom âmbar)
     const ok = sst(0.52, 0.78, M.streak[i]) * 0.45 * oilK;
@@ -195,6 +197,7 @@ function meshTex() {
 // ───────────────────────── camada de desgaste (shader) ─────────────────────────
 /** injeta poeira em superfícies horizontais, sujeira junto ao piso e borda gasta (aEdge) num MeshStandardMaterial */
 export function addWear(mat, { dust = 0.55, edge = 0.9, grime = 0.8, dustCol = 0x8d8576, edgeCol = 0x3a3b3d } = {}) {
+  if (CLEAN) { dust *= 0.25; grime *= 0.25; edge *= 0.5; }
   const dc = new THREE.Color(dustCol), ec = new THREE.Color(edgeCol);
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, { uDust: { value: dust }, uEdge: { value: edge }, uGrime: { value: grime }, uDustCol: { value: dc }, uEdgeCol: { value: ec } });

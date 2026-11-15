@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { HALL, TABLE } from './layout_cams.js';
 import { MACHINES } from './layout_machines.js';
+export const CLEAN = (() => { try { return new URLSearchParams(location.search).get('sujo') !== '1'; } catch { return true; } })(); // galpão limpo e organizado (5S); ?sujo=1 volta ao aspecto antigo
 
 function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
 function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; }
@@ -13,10 +14,10 @@ function canvas(w, h) { const c = document.createElement('canvas'); c.width = w;
 function floorTextures(W, D) {
   const S = 2048, R = rng(11), [c, g] = canvas(S, S), [rc, rg] = canvas(S, S);
   const px = (x) => ((x - HALL.x0) / W) * S, pz = (z) => ((z - HALL.z0) / D) * S;
-  g.fillStyle = '#8b867c'; g.fillRect(0, 0, S, S); rg.fillStyle = '#d0d0d0'; rg.fillRect(0, 0, S, S);
+  g.fillStyle = CLEAN ? '#8e9295' : '#8b867c'; g.fillRect(0, 0, S, S); rg.fillStyle = CLEAN ? '#a6a6a6' : '#d0d0d0'; rg.fillRect(0, 0, S, S); // limpo: piso epóxi cinza, acetinado
   // variação de concreto em manchas grandes
   for (let i = 0; i < 900; i++) {
-    const x = R() * S, y = R() * S, r = 20 + R() * 160, a = 0.03 + R() * 0.07;
+    const x = R() * S, y = R() * S, r = 20 + R() * 160, a = (0.03 + R() * 0.07) * (CLEAN ? 0.3 : 1);
     const gr = g.createRadialGradient(x, y, 0, x, y, r); const v = R() < 0.5 ? '60,56,50' : '160,155,145';
     gr.addColorStop(0, `rgba(${v},${a})`); gr.addColorStop(1, `rgba(${v},0)`); g.fillStyle = gr; g.fillRect(x - r, y - r, 2 * r, 2 * r);
   }
@@ -27,32 +28,32 @@ function floorTextures(W, D) {
       ctx.fillStyle = gr; ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
     }
   };
-  for (const m of MACHINES) if (m.pos[1] < 1) for (let i = 0; i < 14; i++) oil(px(m.pos[0] + (R() - 0.5) * 3), pz(m.pos[2] + (R() - 0.5) * 3), 8 + R() * 40, 0.25 + R() * 0.35);
-  for (let i = 0; i < 420; i++) oil(R() * S, R() * S, 4 + R() * 30, 0.15 + R() * 0.3);
+  if (!CLEAN) for (const m of MACHINES) if (m.pos[1] < 1) for (let i = 0; i < 14; i++) oil(px(m.pos[0] + (R() - 0.5) * 3), pz(m.pos[2] + (R() - 0.5) * 3), 8 + R() * 40, 0.25 + R() * 0.35);
+  if (!CLEAN) for (let i = 0; i < 420; i++) oil(R() * S, R() * S, 4 + R() * 30, 0.15 + R() * 0.3);
   // marcas de pneu de empilhadeira (corredor principal)
   g.lineCap = 'round';
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < (CLEAN ? 0 : 40); i++) {
     const x = px(2.6 + (R() - 0.5) * 2.2); g.strokeStyle = `rgba(30,28,26,${0.05 + R() * 0.08})`; g.lineWidth = 2 + R() * 4;
     g.beginPath(); g.moveTo(x, 0); g.bezierCurveTo(x + (R() - 0.5) * 60, S * 0.3, x + (R() - 0.5) * 80, S * 0.6, x + (R() - 0.5) * 40, S); g.stroke();
   }
   // faixas amarelas de circulação (gastas)
   const lane = (x0, z0, x1, z1, w = 0.1) => {
-    g.save(); g.strokeStyle = 'rgba(214,170,40,0.85)'; g.lineWidth = (w / W) * S; g.beginPath(); g.moveTo(px(x0), pz(z0)); g.lineTo(px(x1), pz(z1)); g.stroke(); g.restore();
+    g.save(); g.strokeStyle = CLEAN ? 'rgb(228,182,30)' : 'rgba(214,170,40,0.85)'; g.lineWidth = (w / W) * S; g.beginPath(); g.moveTo(px(x0), pz(z0)); g.lineTo(px(x1), pz(z1)); g.stroke(); g.restore();
   };
   lane(1.55, HALL.z1, 1.55, HALL.z0); lane(4.2, HALL.z1, 4.2, HALL.z0); lane(HALL.x0, -19.5, HALL.x1, -19.5); lane(HALL.x0, -21.3, HALL.x1, -21.3);
   for (const m of MACHINES) if (m.kind === 'press') {
-    g.strokeStyle = 'rgba(214,170,40,0.7)'; g.lineWidth = (0.08 / W) * S; g.strokeRect(px(m.pos[0] - 1.6), pz(m.pos[2] - 1.5), (3.2 / W) * S, (3.0 / D) * S);
+    g.strokeStyle = CLEAN ? 'rgb(228,182,30)' : 'rgba(214,170,40,0.7)'; g.lineWidth = (0.08 / W) * S; g.strokeRect(px(m.pos[0] - 1.6), pz(m.pos[2] - 1.5), (3.2 / W) * S, (3.0 / D) * S);
   }
   // desgaste da tinta: apaga pontos
   g.globalCompositeOperation = 'source-atop';
-  for (let i = 0; i < 9000; i++) { g.fillStyle = `rgba(120,115,105,${R() * 0.5})`; const r = R() * 3; g.fillRect(R() * S, R() * S, r, r); }
+  for (let i = 0; i < (CLEAN ? 0 : 9000); i++) { g.fillStyle = `rgba(120,115,105,${R() * 0.5})`; const r = R() * 3; g.fillRect(R() * S, R() * S, r, r); }
   g.globalCompositeOperation = 'source-over';
   // juntas de dilatação a cada 6 m e trincas
-  g.strokeStyle = 'rgba(35,33,30,0.55)'; g.lineWidth = 1.5;
+  g.strokeStyle = CLEAN ? 'rgba(60,62,64,0.35)' : 'rgba(35,33,30,0.55)'; g.lineWidth = 1.5;
   for (let x = Math.ceil(HALL.x0 / 6) * 6; x < HALL.x1; x += 6) { g.beginPath(); g.moveTo(px(x), 0); g.lineTo(px(x), S); g.stroke(); }
   for (let z = HALL.z1; z > HALL.z0; z -= 6) { g.beginPath(); g.moveTo(0, pz(z)); g.lineTo(S, pz(z)); g.stroke(); }
   g.strokeStyle = 'rgba(30,28,25,0.5)'; g.lineWidth = 1;
-  for (let i = 0; i < 70; i++) { let x = R() * S, y = R() * S; g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 12; k++) { x += (R() - 0.5) * 14; y += (R() - 0.5) * 14; g.lineTo(x, y); } g.stroke(); }
+  for (let i = 0; i < (CLEAN ? 0 : 70); i++) { let x = R() * S, y = R() * S; g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 12; k++) { x += (R() - 0.5) * 14; y += (R() - 0.5) * 14; g.lineTo(x, y); } g.stroke(); }
   const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 8;
   const rough = new THREE.CanvasTexture(rc); rough.anisotropy = 8;
   return { map, rough };
@@ -71,8 +72,8 @@ function wallTexture() {
   g.fillStyle = '#5f7f6c'; g.fillRect(0, S * 0.7, S, S * 0.3); g.fillStyle = '#3f5547'; g.fillRect(0, S * 0.695, S, 6); // barra inferior pintada (≈1,3 m)
   g.strokeStyle = 'rgba(70,74,64,0.18)'; g.lineWidth = 2;
   for (let y = 0; y < S; y += 32) { g.beginPath(); g.moveTo(0, y); g.lineTo(S, y); g.stroke(); for (let x = (y / 32) % 2 ? 0 : 40; x < S; x += 80) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 32); g.stroke(); } }
-  for (let i = 0; i < 160; i++) { const x = R() * S, w = 3 + R() * 22; const gr = g.createLinearGradient(0, 0, 0, S); gr.addColorStop(0, 'rgba(50,44,36,0.22)'); gr.addColorStop(1, 'rgba(50,44,36,0)'); g.fillStyle = gr; g.fillRect(x, 0, w, S * (0.3 + R() * 0.7)); }
-  const gr = g.createLinearGradient(0, S * 0.6, 0, S); gr.addColorStop(0, 'rgba(30,26,22,0)'); gr.addColorStop(1, 'rgba(30,26,22,0.5)'); g.fillStyle = gr; g.fillRect(0, S * 0.6, S, S * 0.4);
+  for (let i = 0; i < (CLEAN ? 25 : 160); i++) { const x = R() * S, w = 3 + R() * 22; const gr = g.createLinearGradient(0, 0, 0, S); gr.addColorStop(0, 'rgba(50,44,36,0.22)'); gr.addColorStop(1, 'rgba(50,44,36,0)'); g.fillStyle = gr; g.fillRect(x, 0, w, S * (0.3 + R() * 0.7)); }
+  const gr = g.createLinearGradient(0, S * 0.6, 0, S); gr.addColorStop(0, 'rgba(30,26,22,0)'); gr.addColorStop(1, `rgba(30,26,22,${CLEAN ? 0.18 : 0.5})`); g.fillStyle = gr; g.fillRect(0, S * 0.6, S, S * 0.4);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; return t;
 }
 function zebraTexture() {

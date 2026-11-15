@@ -7,6 +7,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MACHINES } from './layout_machines.js';
 import { HALL } from './layout_cams.js';
 import * as T from './props_tex.js';
+export const CLEAN = (() => { try { return new URLSearchParams(location.search).get('sujo') !== '1'; } catch { return true; } })(); // galpão limpo e organizado (5S); ?sujo=1 volta ao aspecto antigo
 
 const R = T.rng(20261112);
 const rr = (a, b) => a + R() * (b - a);
@@ -56,7 +57,8 @@ function mesh(parent, geo, mat, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, opt
   const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz);
   m.userData.cast = opt.cast ?? true; parent.add(m); return m;
 }
-function grp(parent, x = 0, y = 0, z = 0, ry = 0) { const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry; parent.add(g); return g; }
+let STAT = null; // grupo estático do buildProps (objetos de piso) → ângulo alinhado à malha do galpão no modo limpo
+function grp(parent, x = 0, y = 0, z = 0, ry = 0) { if (CLEAN && parent === STAT) ry = Math.round(ry / (Math.PI / 2)) * (Math.PI / 2); const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry; parent.add(g); return g; }
 
 // ── peças estampadas (instanciadas) ──
 function partGeos() {
@@ -80,7 +82,11 @@ function partGeos() {
 export function buildProps(stage, app) {
   const M = mats();
   const root = new THREE.Group(); root.name = 'props';
-  const stat = new THREE.Group(); // estático → fundido por material
+  const stat = new THREE.Group(); STAT = stat; // estático → fundido por material
+  // faixa amarela de demarcação no piso (área de armazenagem, NR-26 / 5S)
+  const zoneMat = std({ color: 0xe2b21c, roughness: 0.55, metalness: 0 });
+  function zone(x, z, ry, w, d, ox = 0, oz = 0) { if (!CLEAN) return; const g = grp(stat, x, 0, z, ry), t = 0.05;
+    for (const s of [-1, 1]) { mesh(g, box(w + t, 0.004, t), zoneMat, ox, 0.002, oz + s * d / 2, 0, 0, 0, { cast: false }); mesh(g, box(t, 0.004, d + t), zoneMat, ox + s * w / 2, 0.002, oz, 0, 0, 0, { cast: false }); } }
   const inst = { plate: [], L: [], D: [], s0: [], s1: [], s2: [] }; const instMat = { plate: M.part, L: M.partOil, D: M.part, s0: M.scrap, s1: M.scrap, s2: M.partOil };
   const tmpO = new THREE.Object3D();
   const pushI = (k, parentMatrix, x, y, z, rx, ry, rz, s = 1) => { tmpO.position.set(x, y, z); tmpO.rotation.set(rx, ry, rz); tmpO.scale.setScalar(s); tmpO.updateMatrix(); inst[k].push(parentMatrix ? tmpO.matrix.clone().premultiply(parentMatrix) : tmpO.matrix.clone()); };
@@ -97,11 +103,11 @@ export function buildProps(stage, app) {
   // pilha ordenada de peças planas (empilhadas)
   function stack(g, kind, cx, cy, cz, n, ry = 0) { g.updateWorldMatrix(true, false); for (let i = 0; i < n; i++) pushI(kind, g.matrixWorld, cx + rr(-0.004, 0.004), cy + i * 0.0045, cz + rr(-0.004, 0.004), 0, ry + rr(-0.05, 0.05), 0); }
   // retalhos espalhados no piso (mundo)
-  function floorScrap(cx, cz, rad, n) { for (let i = 0; i < n; i++) { const a = R() * 6.3, r = Math.sqrt(R()) * rad; pushI(['s0', 's1', 's2', 'plate', 'D'][Math.floor(R() * 5)], null, cx + Math.cos(a) * r, 0.003, cz + Math.sin(a) * r, rr(-0.06, 0.06), R() * 6.3, rr(-0.06, 0.06), rr(0.7, 1.2)); } }
+  function floorScrap(cx, cz, rad, n) { if (CLEAN) return; for (let i = 0; i < n; i++) { const a = R() * 6.3, r = Math.sqrt(R()) * rad; pushI(['s0', 's1', 's2', 'plate', 'D'][Math.floor(R() * 5)], null, cx + Math.cos(a) * r, 0.003, cz + Math.sin(a) * r, rr(-0.06, 0.06), R() * 6.3, rr(-0.06, 0.06), rr(0.7, 1.2)); } }
 
   // ── caixa metálica de peças (aberta, pés para garfo) ──
   function steelBin(x, z, ry, mat, w = 0.9, h = 0.55, d = 0.7, fill = 1, kinds = ['plate', 'L', 'D']) {
-    const g = grp(stat, x, 0, z, ry); const t = 0.022, y0 = 0.1;
+    const g = grp(stat, x, 0, z, ry); const t = 0.022, y0 = 0.1; zone(x, z, g.rotation.y, w + 0.3, d + 0.3);
     mesh(g, box(w, t, d), mat, 0, y0 + t / 2, 0);
     mesh(g, box(w, h, t), mat, 0, y0 + h / 2, d / 2 - t / 2); mesh(g, box(w, h, t), mat, 0, y0 + h / 2, -d / 2 + t / 2);
     mesh(g, box(t, h, d), mat, w / 2 - t / 2, y0 + h / 2, 0); mesh(g, box(t, h, d), mat, -w / 2 + t / 2, y0 + h / 2, 0);
@@ -116,13 +122,13 @@ export function buildProps(stage, app) {
     return mergeGeometries(parts.map((p) => p.toNonIndexed())); })();
   function klt(parent, x, y, z, ry, mat, fill = 0) { const m = mesh(parent, kltGeo, mat, x, y, z, 0, ry); if (fill) { const g = grp(parent, x, y, z, ry); heap(g, ['plate', 'L', 'D'], 0, 0.18 * fill, 0, 0.5, 0.3, 0.1 * fill, 26); } return m; }
   function kltStack(x, z, ry, mats_, cols = 1, rows = 4, fillTop = true) {
-    const g = grp(stat, x, 0, z, ry);
-    for (let c = 0; c < cols; c++) { const n = Math.max(1, rows - Math.floor(R() * 2)); for (let k = 0; k < n; k++) klt(g, c * 0.62 + rr(-0.01, 0.01), k * 0.27, rr(-0.012, 0.012), rr(-0.03, 0.03), mats_[Math.floor(R() * mats_.length)], fillTop && k === n - 1 ? 1 : 0); }
+    const g = grp(stat, x, 0, z, ry); zone(x, z, g.rotation.y, cols * 0.62 + 0.25, 0.65, (cols - 1) * 0.31, 0); const J = CLEAN ? 0 : 1;
+    for (let c = 0; c < cols; c++) { const n = Math.max(1, rows - Math.floor(R() * 2)); for (let k = 0; k < n; k++) klt(g, c * 0.62 + rr(-0.01, 0.01) * J, k * 0.27, rr(-0.012, 0.012) * J, rr(-0.03, 0.03) * J, mats_[Math.floor(R() * mats_.length)], fillTop && k === n - 1 ? 1 : 0); }
     return g;
   }
   // ── palete de madeira ──
   function pallet(parent, x, y, z, ry) {
-    const g = grp(parent, x, y, z, ry);
+    const g = grp(parent, x, y, z, ry); if (parent === stat) zone(x, z, g.rotation.y, 1.5, 1.3);
     for (let i = 0; i < 7; i++) mesh(g, box(1.2, 0.022, 0.1), M.wood, 0, 0.133, -0.45 + i * 0.15);
     for (const zz of [-0.45, 0, 0.45]) { mesh(g, box(1.2, 0.022, 0.1), M.wood, 0, 0.011, zz); for (const xx of [-0.55, 0, 0.55]) mesh(g, box(0.1, 0.078, 0.1), M.wood, xx, 0.061, zz); }
     for (const xx of [-0.55, 0, 0.55]) mesh(g, box(0.1, 0.022, 1.0), M.wood, xx, 0.111, 0);
@@ -134,10 +140,10 @@ export function buildProps(stage, app) {
     pts.push(new THREE.Vector2(r, H - 0.02), new THREE.Vector2(r + 0.006, H), new THREE.Vector2(r - 0.02, H + 0.008), new THREE.Vector2(r - 0.025, H - 0.01), new THREE.Vector2(0, H - 0.01));
     return new THREE.LatheGeometry(pts, 28); })();
   function drum(x, z, mat, ry = 0, top = null) {
-    const g = grp(stat, x, 0, z, ry); mesh(g, drumGeo, mat);
+    const g = grp(stat, x, 0, z, ry); mesh(g, drumGeo, mat); zone(x, z, 0, 0.8, 0.8);
     mesh(g, cyl(0.03, 0.03, 0.02, 10), M.dark, 0.16, 0.88, 0.05);
     if (top === 'funnel') { mesh(g, cyl(0.12, 0.02, 0.14, 16), M.drumRed, -0.08, 0.95, -0.04); }
-    if (top === 'rag') mesh(g, rag(0.35, 3), M.ragR, -0.03, 0.885, 0.02, 0, R() * 3);
+    if (top === 'rag' && !CLEAN) mesh(g, rag(0.35, 3), M.ragR, -0.03, 0.885, 0.02, 0, R() * 3);
     return g;
   }
   // trapo: plano amassado
@@ -155,16 +161,19 @@ export function buildProps(stage, app) {
   }
   // mangueira/cabo no piso por pontos (x,z) — tubo com leve ondulação
   function floorTube(pts, rad, mat, segs = 120) {
+    if (CLEAN) return; // cabos e mangueiras pela eletrocalha/linha aérea, nada solto no piso
     const v = pts.map(([x, z, y = 0]) => new THREE.Vector3(x, rad + y, z)); const c = new THREE.CatmullRomCurve3(v, false, 'catmullrom', 0.4);
     mesh(stat, new THREE.TubeGeometry(c, segs, rad, 7), mat, 0, 0, 0, 0, 0, 0, { cast: false });
   }
   // rolo de mangueira/cabo largado (espiras empilhadas)
   function coil(x, z, rad, R0, turns, mat) {
+    if (CLEAN) return;
     const pts = []; for (let i = 0; i <= turns * 24; i++) { const a = (i / 24) * Math.PI * 2; const rrr = R0 * (1 + 0.12 * Math.sin(a * 0.5 + i * 0.01)) + (i / (turns * 24)) * 0.04; pts.push(new THREE.Vector3(x + Math.cos(a) * rrr, rad + Math.min(0.6, i / (turns * 24)) * rad * 3 * (0.5 + 0.5 * Math.sin(a)), z + Math.sin(a) * rrr * 0.85)); }
     mesh(stat, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), turns * 30, rad, 7), mat, 0, 0, 0, 0, 0, 0, { cast: false });
   }
   // poça de óleo + serragem absorvente
   function puddle(x, z, s, sawdust = true, ry = R() * 6) {
+    if (CLEAN) return; // piso limpo: sem óleo nem serragem
     const o = mesh(stat, new THREE.PlaneGeometry(s, s * 0.75).rotateX(-Math.PI / 2), M.oil, x, 0.004, z, 0, ry, 0, { cast: false }); o.renderOrder = 2;
     if (sawdust) { const d = mesh(stat, new THREE.PlaneGeometry(s * 0.8, s * 0.7).rotateX(-Math.PI / 2), M.saw, x + s * 0.18, 0.006, z - s * 0.08, 0, ry + 0.7, 0, { cast: false }); d.renderOrder = 3; }
   }
@@ -193,7 +202,7 @@ export function buildProps(stage, app) {
     for (let i = 0; i < 4; i++) mesh(g, box(0.22 - i * 0.03, 0.008, 0.022), M.chrome, -0.15 + rr(-0.02, 0.02), H + 0.045, -0.12 + i * 0.05, 0, rr(-0.2, 0.2), 0, { cast: false });
     mesh(g, cyl(0.014, 0.014, 0.3, 8).rotateZ(Math.PI / 2), M.stick, 0.14, H + 0.055, 0.08, 0, 0.5, 0); mesh(g, box(0.1, 0.035, 0.035), M.dark, 0.02, H + 0.06, 0.15, 0, 0.5, 0);
     mesh(g, cyl(0.032, 0.032, 0.19, 14), M.blue, 0.22, H + 0.135, -0.1); mesh(g, cyl(0.012, 0.012, 0.03, 8), M.dark, 0.22, H + 0.245, -0.1);
-    mesh(g, rag(0.3, 7), M.ragW, -0.1, H + 0.04, 0.12, 0, 1.0, 0, { cast: false });
+    if (!CLEAN) mesh(g, rag(0.3, 7), M.ragW, -0.1, H + 0.04, 0.12, 0, 1.0, 0, { cast: false });
     return g;
   }
   // armário de gavetas + estante aberta com caixas, latas e papelão
@@ -249,7 +258,7 @@ export function buildProps(stage, app) {
       } else {
         // prensa do posto: luvas + trapo + caixinha de peças sobre a mesa; KLT com peças no chão ao lado
         glove(f, 0.36, 0.882, 0.3, 0.6); glove(f, 0.42, 0.886, 0.22, 2.3, 0.6);
-        mesh(f, rag(0.3, 4), M.ragR, -0.36, 0.882, 0.3, 0, 0.4, 0, { cast: false });
+        if (!CLEAN) mesh(f, rag(0.3, 4), M.ragR, -0.36, 0.882, 0.3, 0, 0.4, 0, { cast: false });
         const tb = grp(f, -0.2, 0.882, 0.36); heap(tb, ['plate', 'L'], 0, 0.004, 0, 0.12, 0.06, 0.01, 6);
         const kq = w(-0.95, -0.2); klt(stat, kq.x, 0, kq.z, m.rotY + 0.1, M.klBlue, 1);
         const kq2 = w(-1.05, 0.35); klt(stat, kq2.x, 0, kq2.z, m.rotY - 0.08, M.klGrey, 1);
@@ -309,14 +318,14 @@ export function buildProps(stage, app) {
     const v = grp(g, -L / 2 + 0.25, H + 0.025, D / 2 - 0.12); mesh(v, box(0.16, 0.12, 0.2), M.blue, 0, 0.06, 0); mesh(v, box(0.18, 0.08, 0.04), M.dark, 0, 0.15, 0.06); mesh(v, cyl(0.01, 0.01, 0.3, 6).rotateZ(Math.PI / 2), M.chrome, 0, 0.1, 0.16);
     klt(g, 0.1, H + 0.025, -0.08, 0.05, [M.klBlue, M.klGrey, M.klYel][Math.floor(R() * 3)], 1);
     const hp = grp(g, -0.45, H + 0.03, 0.05); heap(hp, ['plate', 'L', 'D'], 0, 0, 0, 0.4, 0.3, 0.03, 16);
-    mesh(g, rag(0.3, 11), M.ragW, 0.55, H + 0.03, 0.15, 0, R() * 3, 0, { cast: false });
+    if (!CLEAN) mesh(g, rag(0.3, 11), M.ragW, 0.55, H + 0.03, 0.15, 0, R() * 3, 0, { cast: false });
     for (let i = 0; i < 4; i++) mesh(g, box(0.02, 0.22, 0.02), M.chrome, -0.6 + i * 0.12, H + 0.32, -D / 2 + 0.04);
     mesh(g, box(0.4, 0.14, 0.12), M.red, 0.6, H + 0.35, -D / 2 + 0.08);
     return g;
   }
   // carrinho plataforma com caixas/peças
   function platCart(x, z, ry) {
-    const g = grp(stat, x, 0, z, ry); const L = 1.1, W = 0.65;
+    const g = grp(stat, x, 0, z, ry); const L = 1.1, W = 0.65; zone(x, z, g.rotation.y, 1.4, 0.95);
     mesh(g, box(L, 0.04, W), M.grey, 0, 0.22, 0);
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) mesh(g, cyl(0.07, 0.07, 0.04, 14).rotateX(Math.PI / 2), M.rubber, sx * (L / 2 - 0.1), 0.07, sz * (W / 2 - 0.08));
     mesh(g, box(0.03, 0.85, 0.03), M.grey, -L / 2, 0.64, -W / 2 + 0.03); mesh(g, box(0.03, 0.85, 0.03), M.grey, -L / 2, 0.64, W / 2 - 0.03); mesh(g, cyl(0.016, 0.016, W, 8).rotateX(Math.PI / 2), M.dark, -L / 2, 1.05, 0);

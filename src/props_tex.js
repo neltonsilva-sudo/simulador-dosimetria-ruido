@@ -1,5 +1,6 @@
 // Texturas procedurais dos DETALHES (canvas): pintura gasta com ferrugem/óleo/poeira, plástico, placas NR-26, decalques de piso.
 import * as THREE from 'three';
+export const CLEAN = (() => { try { return new URLSearchParams(location.search).get('sujo') !== '1'; } catch { return true; } })(); // galpão limpo e organizado (5S); ?sujo=1 volta ao aspecto antigo
 
 export function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
 function cv(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; }
@@ -12,6 +13,7 @@ const once = (k, f) => (memo.has(k) ? memo.get(k) : (memo.set(k, f()), memo.get(
 
 /** pintura industrial gasta: base + manchas de sujeira + ferrugem nas bordas + arranhões + escorridos de óleo */
 export function paintTex(hex, { rust = 1, oil = 1, seed = 1, S = 512 } = {}) {
+  if (CLEAN) { rust *= 0.12; oil *= 0.12; }
   return once(`paint${hex}_${rust}_${oil}_${seed}`, () => {
     const [c, x] = cv(S, S), R = rng(seed * 977 + hex);
     const col = new THREE.Color(hex);
