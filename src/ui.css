@@ -172,3 +172,16 @@
 .ui-dose .dz-pass li { margin:4px 0; } .ui-dose .dz-pass li > span { display:block; text-transform:uppercase; letter-spacing:.05em; font-size:10.5px; }
 .ui-dose .dz-pass .eq { margin:2px 0; font-size:14px; }
 @media (max-width: 760px) { .ui-dose .dz-cards3 { grid-template-columns:1fr 1fr; } }
+/* aula da Dose — configuração (teclas) e calibração */
+.ui-dose .dz-keys { display:grid; grid-template-columns:repeat(auto-fit,minmax(118px,1fr)); gap:8px; margin:8px 0; }
+.ui-dose .dz-keys > div { display:grid; grid-template-columns:auto 1fr; grid-template-rows:auto auto; column-gap:9px; align-items:center; padding:8px 10px; border-radius:10px;
+  background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); opacity:.55; transition:opacity .35s, border-color .35s, background .35s; }
+.ui-dose .dz-keys > div.on { opacity:1; border-color:rgba(48,164,108,.65); background:rgba(48,164,108,.12); }
+.ui-dose .dz-keys kbd { grid-row:1 / 3; min-width:34px; padding:5px 6px; border-radius:7px; text-align:center; font:700 10.5px/1 'Roboto Condensed',system-ui,sans-serif;
+  color:#e9edf1; background:linear-gradient(#4a5058,#2c3137); box-shadow:0 2px 0 #15181b, inset 0 1px 0 rgba(255,255,255,.18); }
+.ui-dose .dz-keys kbd.pw { background:linear-gradient(#3b8be0,#1d5fae); font-size:14px; }
+.ui-dose .dz-keys span { font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:#9aa4ae; }
+.ui-dose .dz-keys b { font-size:13px; }
+.ui-dose .dz-cal tr[data-k] { opacity:.4; transition:opacity .35s; }
+.ui-dose .dz-cal tr[data-k].on { opacity:1; }
+.ui-dose .dz-cal td.ok { color:#3fd08a; font-weight:700; }

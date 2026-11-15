@@ -5,6 +5,7 @@
 import { CRITERIA, allowedMinutes, nr15AllowedMinutes } from './dosimetry.js';
 import { MACHINES } from './layout_machines.js';
 import { buildSLM } from './ui_slm.js';
+import { buildSlmCal } from './slm_cal.js';
 
 // Caso pedido pelo usuário: ruído contínuo, 4 h a 90 dB(A) + 4 h a 85 dB(A)
 export const DOSE_CASE = [
@@ -44,9 +45,54 @@ export const DOSE_STEPS = [
     text: 'A dose de ruído é a porcentagem da exposição diária máxima permitida que o trabalhador já recebeu. Cem por cento significa que o limite de exposição foi atingido. Cada nível de ruído tem um tempo máximo permitido, e cada minuto de exposição consome uma parte desse tempo. Quando há mais de um nível na jornada, somamos as frações de cada um. Neste galpão, o trabalhador fica 4 horas na máquina 1 e 4 horas na máquina 2.',
     html: () => `<div class="eq big">D = ${P(`${fr(sub('C', 1), sub('T', 1))} + ${fr(sub('C', 2), sub('T', 2))} + … + ${fr(sub('C', 'n'), sub('T', 'n'))}`)} × 100 %</div>
       <ul class="dz-leg2"><li><b>D</b> = dose diária (%)</li><li><b>C<sub>n</sub></b> = tempo real de exposição ao nível n</li><li><b>T<sub>n</sub></b> = tempo máximo permitido para o nível n</li></ul>${caseTable()}` },
+  { id: 'config', dur: 31.4, cam: 'meter', meter: 'm1', solo: ['prensa1'], focus: 'prensa1',
+    title: 'Configuração do decibelímetro',
+    text: 'Antes de medir, configuramos o decibelímetro. Ligamos o aparelho na tecla azul e conferimos a carga da bateria. Na tecla A barra C escolhemos a ponderação A, que imita a sensibilidade do ouvido humano e é a usada para avaliar a exposição ocupacional. Na tecla F barra S escolhemos a resposta lenta, slow, indicada para ruído contínuo. A função MAX fica desligada, para o visor mostrar o nível instantâneo, e a tecla LEVEL ajusta a faixa de medição, para que o valor lido não fique fora da escala.',
+    init: (slm) => slm.setMode?.({ power: false, weight: 'C', resp: 'F', max: true, cal: false }),
+    cues: [
+      ['Ligamos o aparelho', (k) => { k.slm.highlight?.('power'); k.slm.press?.('power'); k.slm.setMode?.({ power: true }); k.mark('power') }],
+      ['Na tecla A barra C', (k) => k.slm.highlight?.('ac')],
+      ['escolhemos a ponderação A', (k) => { k.slm.press?.('ac'); k.slm.setMode?.({ weight: 'A' }); k.mark('ac') }],
+      ['Na tecla F barra S', (k) => k.slm.highlight?.('fs')],
+      ['escolhemos a resposta lenta', (k) => { k.slm.press?.('fs'); k.slm.setMode?.({ resp: 'S' }); k.mark('fs') }],
+      ['A função MAX', (k) => { k.slm.highlight?.('maxmin'); k.slm.press?.('maxmin'); k.slm.setMode?.({ max: false }); k.mark('maxmin') }],
+      ['a tecla LEVEL', (k) => { k.slm.highlight?.('level'); k.slm.press?.('level'); k.mark('level') }],
+      ['fora da escala', (k) => k.slm.highlight?.(null)],
+    ],
+    html: () => `<div class="dz-keys">
+        <div data-k="power"><kbd class="pw">⏻</kbd><span>Liga</span><b>Bateria OK</b></div>
+        <div data-k="ac"><kbd>A/C</kbd><span>Ponderação</span><b>A · dB(A)</b></div>
+        <div data-k="fs"><kbd>F/S</kbd><span>Resposta</span><b>Lenta (SLOW)</b></div>
+        <div data-k="maxmin"><kbd>MAX/MIN</kbd><span>Retenção</span><b>Desligada</b></div>
+        <div data-k="level"><kbd>LEVEL</kbd><span>Faixa</span><b>Valor dentro da escala</b></div></div>
+      <div class="dz-live">Visor agora: <b data-live>--,-</b> <span data-unit>dB</span></div>` },
+  { id: 'calib', dur: 41.5, cam: 'head', meter: 'm1', solo: [], focus: 'prensa1',
+    title: 'Calibração com o calibrador acústico',
+    text: 'Agora verificamos a calibração. Retiramos o protetor de espuma e encaixamos o calibrador acústico no microfone, até o anel de borracha assentar. Ligamos o calibrador: ele emite um tom puro de 1 quilohertz, com nível de 114 decibéis. Com o aparelho em modo de calibração, o visor deve indicar 114,0; como indicou 113,6, ajustamos até 114,0. Em seguida, conferimos também em 94 decibéis. Retiramos o calibrador, recolocamos a espuma e anotamos o resultado. Ao final das medições repetimos a verificação: se a diferença passar de 1 decibel, as medições devem ser refeitas.',
+    init: (slm) => slm.setMode?.({ power: true, weight: 'A', resp: 'S', max: false, cal: false }),
+    cues: [
+      ['Retiramos o protetor', (k) => k.slm.setWindscreen?.(false)],
+      ['encaixamos o calibrador', (k) => k.couple()],
+      ['Ligamos o calibrador', (k) => { k.cal(114); k.slm.setMode?.({ cal: true }); k.slm.setTarget(113.6); k.mark('c114') }],
+      ['ajustamos até 114,0', (k) => { k.slm.setTarget(114); k.mark('adj') }],
+      ['conferimos também em 94', (k) => { k.cal(94); k.slm.setTarget(94); k.mark('c94') }],
+      ['Retiramos o calibrador', (k) => { k.cal(0); k.slm.setMode?.({ cal: false }); k.uncouple() }],
+      ['recolocamos a espuma', (k) => { k.slm.setWindscreen?.(true); k.slm.setTarget(SPOTS.m1.L); k.mark('ok') }],
+    ],
+    html: () => `<div class="dz-cards dz-cards3">
+        <div style="--c:#5aa4ff"><span>Calibrador</span><b>Classe 1</b><small>IEC 60942 · acoplador ½"</small></div>
+        <div style="--c:#5aa4ff"><span>Sinal de referência</span><b>1 kHz</b><small>114 dB e 94 dB</small></div>
+        <div style="--c:#30a46c"><span>Critério</span><b>±1 dB</b><small>entre a verificação inicial e a final</small></div></div>
+      <table class="dz-t dz-cal"><tr><th>Etapa</th><th>Calibrador</th><th>Visor</th><th></th></tr>
+        <tr data-k="c114"><td>Leitura inicial</td><td>114,0 dB</td><td>113,6 dB</td><td>ajustar</td></tr>
+        <tr data-k="adj"><td>Após o ajuste</td><td>114,0 dB</td><td>114,0 dB</td><td class="ok">✓</td></tr>
+        <tr data-k="c94"><td>Conferência</td><td>94,0 dB</td><td>94,0 dB</td><td class="ok">✓</td></tr>
+        <tr data-k="ok"><td>Verificação final</td><td colspan="3">repetir ao fim das medições</td></tr></table>
+      <p class="dz-note">Em 1 kHz as ponderações A e C coincidem: o tom de 114 dB é lido como 114 dB(A).</p>
+      <div class="dz-live">Visor agora: <b data-live>--,-</b> <span data-unit>dB</span></div>` },
   { id: 'medir', cam: 'spot', meter: 'm1', solo: ['prensa1'], focus: 'prensa1',
     title: 'Medição com o decibelímetro',
-    text: 'Antes de calcular a dose, quantificamos o nível de ruído de cada posto com o decibelímetro, o medidor de nível de pressão sonora. Ele é verificado com o calibrador acústico antes e depois da medição. Com a tecla A barra C selecionamos o circuito de ponderação A, e com a tecla F barra S, a resposta lenta. O microfone fica na zona auditiva do trabalhador, na altura do ouvido e voltado para a fonte, com o avaliador afastado para não interferir. Como o ruído é contínuo, lemos o valor estabilizado no visor.',
+    text: 'Com o decibelímetro configurado e verificado, quantificamos o nível de ruído de cada posto. O microfone fica na zona auditiva do trabalhador, na altura do ouvido e voltado para a fonte, com o avaliador afastado para não interferir. Como o ruído é contínuo, lemos o valor estabilizado no visor. Se o ruído variasse ao longo da jornada, o mais indicado seria o dosímetro, que integra toda a exposição.',
     html: () => `<div class="dz-cards dz-cards3">
         <div style="--c:#5aa4ff"><span>Ponderação</span><b>A · dB(A)</b><small>tecla A/C</small></div>
         <div style="--c:#5aa4ff"><span>Resposta</span><b>Lenta (S)</b><small>tecla F/S</small></div>
@@ -122,7 +168,7 @@ const CAMS = {
 export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = () => false, resumeVoice = async () => false }) {
   const THREE = app.stage.THREE;
   const host = root.parentElement ? root : document.body;
-  let active = false, idx = 0, token = 0, auto = true, prevView = null;
+  let active = false, idx = 0, token = 0, auto = new URLSearchParams(location.search).get('doseauto') !== '0', prevView = null; // ?doseauto=0: sem avanço automático (capturas)
 
   // ── decibelímetro no tripé ──
   const slm = buildSLM(THREE); app.stage.scene.add(slm.group); let slmAt = null;
@@ -132,6 +178,59 @@ export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = ()
     if (!close) return { pos: [sp.pos[0] + b[0] * 2.1 + sd[0] * 0.9, 1.85, sp.pos[1] + b[1] * 2.1 + sd[1] * 0.9], target: [(sp.pos[0] + sp.src[0]) / 2 - sd[0] * 0.8, 1.3, (sp.pos[1] + sp.src[1]) / 2 - sd[1] * 0.8], fov: 48 };
     const P = slm.lcdWorld(tmpV);
     return { pos: [P.x + b[0] * 0.4 + sd[0] * 0.06, P.y + 0.24, P.z + b[1] * 0.4 + sd[1] * 0.06], target: [P.x - b[0] * 0.3 - sd[0] * 0.13, P.y - 0.1, P.z - b[1] * 0.3 - sd[1] * 0.13], fov: 40 };
+  }
+
+  // close da cabeça do medidor (microfone + calibrador acoplado)
+  function headCam(key) {
+    const sp = SPOTS[key]; const bx = sp.pos[0] - sp.src[0], bz = sp.pos[1] - sp.src[1], bl = Math.hypot(bx, bz), b = [bx / bl, bz / bl], sd = [-b[1], b[0]];
+    slm.group.updateWorldMatrix(true, true); const P = (slm.micTip || slm.mic).getWorldPosition(new THREE.Vector3());
+    return { pos: [P.x + b[0] * 0.62 + sd[0] * 0.26, P.y + 0.1, P.z + b[1] * 0.62 + sd[1] * 0.26], target: [P.x - sd[0] * 0.03, P.y - 0.02, P.z - sd[1] * 0.03], fov: 38 };
+  }
+
+  // ── calibrador acústico da cena acoplado ao microfone do decibelímetro ──
+  // (mesma geometria do acoplamento do dosímetro em demo.js: boca do acoplador coaxial à cápsula, inserção de ~8 mm)
+  const CAL_RY = +(new URLSearchParams(location.search).get('calry') ?? -0.4); // giro do calibrador em torno do eixo do microfone (painel para a câmera)
+  const MIC_INSERT = 0.0078; let calTween = null, calAnchor = null;
+  function cavityLocal(c) {
+    const g = c.group; g.updateWorldMatrix(true, true); c.cavity.updateWorldMatrix(true, false);
+    const m = new THREE.Matrix4().copy(g.matrixWorld).invert().multiply(c.cavity.matrixWorld), p = new THREE.Vector3(); m.decompose(p, new THREE.Quaternion(), new THREE.Vector3()); return p;
+  }
+  function anchor(c) {
+    const tip = slm.micTip || slm.mic; if (!tip || !c?.cavity) return null;
+    if (!calAnchor) { calAnchor = new THREE.Object3D(); calAnchor.name = 'slmCalCouple'; tip.add(calAnchor); }
+    const cp = cavityLocal(c), ax = [Math.abs(cp.x), Math.abs(cp.y), Math.abs(cp.z)], i = ax.indexOf(Math.max(...ax));
+    const u = new THREE.Vector3(); u.setComponent(i, Math.sign(cp.getComponent(i)) || 1);
+    const f = new THREE.Vector3(0, 0, 1); if (Math.abs(u.z) > 0.9) f.set(0, 1, 0); f.addScaledVector(u, -f.dot(u)).normalize();
+    const S = new THREE.Matrix4().makeBasis(f, u, new THREE.Vector3().crossVectors(f, u));
+    const T = new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, -1, 0), new THREE.Vector3(1, 0, 0));
+    calAnchor.quaternion.setFromRotationMatrix(T.multiply(S.transpose()));
+    calAnchor.position.set(0, -MIC_INSERT, 0).sub(cp.clone().applyQuaternion(calAnchor.quaternion));
+    return calAnchor;
+  }
+  const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+  // calibrador próprio do decibelímetro (modelo cilíndrico, slm_cal.js) — o CalPro do kit do dosímetro não é mexido
+  const scal = buildSlmCal(THREE); scal.group.visible = false;
+  function slide(from, to, dur) { calTween = { t: 0, from, to, dur, c: scal }; } // desloca ao longo do eixo da cápsula (m, +afastado)
+  function couple() {
+    const a = anchor(scal); if (!a) return;
+    a.add(scal.group); scal.group.position.set(0, 0.06, 0); scal.group.quaternion.identity(); scal.group.rotation.y = CAL_RY; scal.group.visible = true;
+    slide(0.06, 0, 1.6);
+  }
+  function uncouple() { if (scal.group.visible) slide(0, 0.07, 1.1); }
+  function calRelease() { calTween = null; app.audio?.tone?.(false); scal.setOn(false); scal.group.visible = false; }
+  function calSet(lv) {
+    if (!lv) { scal.press('power'); scal.setOn(false); app.audio?.tone?.(false); return; }
+    if (!scal.isOn()) scal.press('power'); else scal.press(String(lv));
+    scal.setOn(true); scal.setLevel(lv); app.audio?.tone?.(true, lv);
+  }
+  // ações sincronizadas com a fala: relógio que para quando a aula é pausada
+  let cues = [], actT = 0, held = false;
+  const cueCtx = { slm, couple, uncouple, cal: calSet, mark: (k) => { marked.add(k); applyMarks(); } };
+  const marked = new Set(); const applyMarks = () => marked.forEach((k) => panel.querySelectorAll(`[data-k="${k}"]`).forEach((e) => e.classList.add('on')));
+  const CPS = 14.2; // caracteres por segundo da voz gravada (Francisca, medido nos MP3)
+  function resetRig() {
+    calRelease(); slm.highlight?.(null); slm.setWindscreen?.(true);
+    slm.setMode?.({ power: true, weight: 'A', resp: 'S', max: false, cal: false });
   }
 
   // ── marcadores 3D: anéis de ruído no piso (ondas) ──
@@ -151,7 +250,11 @@ export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = ()
   const v = new THREE.Vector3();
   app.stage.onFrame((dt, t) => {
     if (!active) return;
-    slm.update(dt, t); const lv = panel.querySelector('[data-live]'); if (lv && slm.group.visible) lv.textContent = slm.reading.toFixed(1).replace('.', ',');
+    if (!held) { actT += dt; while (cues.length && cues[0].t <= actT) cues.shift().fn(cueCtx); }
+    if (calTween) { const k = calTween; k.t = Math.min(1, k.t + dt / k.dur); k.c.group.position.y = k.from + (k.to - k.from) * ease(k.t);
+      if (k.t >= 1) { calTween = null; if (k.to > 0.065) { k.c.group.visible = false; } } }
+    scal.update(dt); slm.update(dt, t); const un = panel.querySelector('[data-unit]'); if (un) un.textContent = slm.unit ? slm.unit() : 'dB';
+    const lv = panel.querySelector('[data-live]'); if (lv && slm.group.visible) lv.textContent = slm.reading.toFixed(1).replace('.', ',');
     const cam = app.stage.camera, W = innerWidth, H = innerHeight;
     for (const m of marks) {
       const want = m.focusOn ? 1 : 0.28; m.on += (want - m.on) * Math.min(1, dt * 4);
@@ -183,21 +286,24 @@ export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = ()
     panel.querySelectorAll('.dz-nav button').forEach((b) => (b.onclick = () => {
       const a = b.dataset.a;
       if (a === 'prev') go(idx - 1); else if (a === 'next') (idx === DOSE_STEPS.length - 1 ? close() : go(idx + 1));
-      else if (a === 'rep') go(idx); else if (a === 'auto') { auto = !auto; if (auto) resume(); else pauseVoice(); paint(); }
+      else if (a === 'rep') go(idx); else if (a === 'auto') { auto = !auto; held = !auto; if (auto) resume(); else pauseVoice(); paint(); }
     }));
-    panel.scrollTop = 0;
+    applyMarks(); panel.scrollTop = 0;
   }
   function solo(ids) {
     const map = {}; for (const m of MACHINES) map[m.id] = ids.includes(m.id); app.audio?.setRunning?.(map);
   }
   async function go(i) {
     if (!active) return; i = Math.max(0, Math.min(DOSE_STEPS.length - 1, i));
-    const my = ++token; idx = i; const st = DOSE_STEPS[i]; paint();
+    const my = ++token; idx = i; const st = DOSE_STEPS[i]; marked.clear(); paint();
+    held = false; resetRig(); st.init?.(slm);
+    actT = 0; cues = (st.cues || []).map(([mk, fn]) => ({ t: Math.max(0, st.text.indexOf(mk)) * (st.dur ? st.dur / st.text.length : 1 / CPS), fn })).sort((a, b) => a.t - b.t);
     for (const m of marks) m.focusOn = !st.focus || st.focus === m.c.id;
     solo(st.solo);
     if (st.meter) { slm.group.visible = true; if (slmAt !== st.meter) { slmAt = st.meter; slm.placeAt(SPOTS[st.meter].pos, SPOTS[st.meter].src); } slm.setTarget(SPOTS[st.meter].L); }
     else { slm.group.visible = false; slmAt = null; }
-    if (st.cam === 'meter' || st.cam === 'spot') {
+    if (st.cam === 'head') { app.stage.flyTo(headCam(st.meter), 2.2); app.stage.setFocus?.((slm.micTip || slm.mic).getWorldPosition(new THREE.Vector3())); }
+    else if (st.cam === 'meter' || st.cam === 'spot') {
       const v2 = spotCam(st.meter, st.cam === 'meter'); app.stage.flyTo(v2, 2.2);
       if (st.cam === 'meter') app.stage.setFocus?.(slm.lcdWorld(new THREE.Vector3())); else app.stage.setFocus?.(null);
     } else { app.stage.flyTo(CAMS[st.cam], 2.2); app.stage.setFocus?.(null); }
@@ -222,7 +328,7 @@ export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = ()
     go(start);
   }
   function close() {
-    if (!active) return; active = false; token++; stopVoice();
+    if (!active) return; active = false; token++; stopVoice(); cues = []; resetRig();
     host.classList.remove('dose-on'); panel.classList.add('hidden'); group.visible = false; slm.group.visible = false; slmAt = null;
     for (const m of marks) m.lbl.classList.add('hidden');
     app.audio?.setRunning?.(app.running());
