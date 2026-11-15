@@ -234,3 +234,38 @@
 .ui-dose .dz-keys kbd { grid-row:auto; }
 .ui-dose .dz-keys span, .ui-dose .dz-keys b { max-width:100%; overflow-wrap:anywhere; line-height:1.2; }
 @media (max-width: 760px) { .ui-dose .dz-keys { grid-template-columns:repeat(auto-fill, minmax(110px, 1fr)); } }
+/* ═══ Atividades práticas avaliadas (atividade.js) ═══ */
+.ativ-on .ui-bar, .ativ-on .ui-caption, .ativ-on .ui-dash, .ativ-on .ui-live { display:none !important; }
+.ativ1 .ui-lcd { display:none !important; }
+.ui-ativ .ativ-case { font-size:13px; color:#cfd6dd; margin:6px 0 8px; } .ui-ativ .ativ-case .dz-t { margin:6px 0 0; }
+.ativ-tabs { display:flex; flex-wrap:wrap; gap:5px; margin:6px 0 10px; }
+.ativ-tabs button { flex:1 1 auto; padding:7px 9px; border-radius:9px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.05); color:#cfd6dd; font:600 12.5px inherit; font-family:inherit; cursor:pointer; }
+.ativ-tabs button.on { background:linear-gradient(180deg,#2f8cff,#1767d8); border-color:#5aa4ff; color:#fff; }
+.ativ-body h4 { margin:12px 0 6px; font-size:13px; color:#ffd54f; text-transform:uppercase; letter-spacing:.04em; }
+.ativ-list { margin:6px 0 8px; padding-left:20px; color:#d7dce1; font-size:14px; line-height:1.6; }
+.ativ-act { display:grid; gap:8px; margin:8px 0; }
+.ativ-act > div { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:8px 10px; border-radius:10px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); }
+.ativ-act span { min-width:104px; font-size:11.5px; text-transform:uppercase; letter-spacing:.05em; color:#9aa4ae; }
+.ativ-act .ui-btn.on, .ativ-med .ui-btn.ok { background:linear-gradient(180deg,#2fbf71,#1e8f52); border-color:#5fd49a; }
+.ativ-med input, .ativ-form input { width:100%; box-sizing:border-box; padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,.2); background:rgba(0,0,0,.35); color:#fff; font:600 15px "Roboto Mono", ui-monospace, monospace; }
+.ativ-med tr.here td { background:rgba(90,164,255,.12); }
+.ativ-form { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin:10px 0; }
+.ativ-form label, .ativ-text { display:grid; gap:4px; font-size:12.5px; color:#c3cad1; }
+.ativ-text { margin-top:10px; } .ativ-text textarea { width:100%; box-sizing:border-box; padding:8px; border-radius:8px; border:1px solid rgba(255,255,255,.2); background:rgba(0,0,0,.35); color:#fff; font:14px inherit; font-family:inherit; resize:vertical; }
+.ativ-radio, .ativ-check { display:grid; gap:6px; } .ativ-radio.row { grid-auto-flow:column; justify-content:start; gap:18px; }
+.ativ-radio label, .ativ-check label { display:flex; gap:8px; align-items:flex-start; font-size:13.5px; color:#d7dce1; padding:6px 8px; border-radius:8px; background:rgba(255,255,255,.03); cursor:pointer; }
+.ativ-radio input, .ativ-check input { margin-top:3px; accent-color:#2f8cff; }
+.ativ-chips { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+.ativ-chip { font-size:12.5px; padding:5px 10px; border-radius:20px; background:rgba(255,255,255,.07); color:#aab3bd; } .ativ-chip.ok { background:rgba(47,191,113,.22); color:#9ff0c4; font-weight:700; }
+.ativ-user { font-size:13px !important; }
+.ativ-toast { position:absolute; left:50%; top:18px; transform:translateX(-50%); z-index:30; padding:10px 16px; border-radius:10px; background:rgba(229,72,77,.95); color:#fff; font-weight:600; font-size:14px; box-shadow:0 8px 30px rgba(0,0,0,.4); }
+.ativ-modal { z-index:25; }
+.ativ-name { display:grid; gap:4px; margin:6px 0 10px; font-size:13px; color:#c3cad1; } .ativ-name input { padding:10px 12px; border-radius:9px; border:1px solid rgba(255,255,255,.2); background:rgba(0,0,0,.35); color:#fff; font:600 15px inherit; font-family:inherit; }
+.ativ-choose { max-width:680px; } .ativ-crit summary { cursor:pointer; color:#9cc8ff; margin:6px 0; } .ativ-crit h4 { margin:10px 0 4px; color:#ffd54f; }
+.ativ-bol { max-width:860px; } .ativ-bol .dz-t td { font-size:13px; } .ativ-tab tr.grp td { background:rgba(255,255,255,.06); font-weight:700; color:#ffd54f; }
+.ativ-nota { display:inline-flex; align-items:baseline; gap:8px; padding:10px 18px; border-radius:12px; margin:4px 0 12px; } .ativ-nota b { font:800 40px "Roboto Mono", monospace; }
+.ativ-nota.ok { background:rgba(47,191,113,.2); color:#9ff0c4; } .ativ-nota.bad { background:rgba(229,72,77,.22); color:#ffc0bb; } .ativ-nota span { text-transform:uppercase; font-size:12px; letter-spacing:.08em; }
+.ativ-bol-nav { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; flex-wrap:wrap; }
+@media print { body.print-ativ #c, body.print-ativ .ui-ativ, body.print-ativ .ui-slmlcd, body.print-ativ .ui-lcd, body.print-ativ .ativ-bol-nav { display:none !important; }
+  body.print-ativ .ativ-bol { color:#000; background:#fff; } body.print-ativ .ativ-tab tr.grp td { color:#000; } }
+@media (max-width: 760px) { .ativ-act span { min-width:auto; width:100%; } }

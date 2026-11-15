@@ -1,6 +1,7 @@
 // Interface + demonstração narrada — dono: UI/DEMO.
 // Fluxo: explorar → Dosímetro (apresentação: operar + calibrar) → colocar na trabalhadora → iniciar dosimetria → parar + pós-cal → relatório.
 import { STEPS, CHAPTERS, MOUNT_TEXT, CAPTIONS, fwDo, demoClock } from './demo.js';
+import { createActivities } from './atividade.js';
 import { createDoseLesson } from './ui_dose.js';
 
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -130,6 +131,8 @@ export function createUI(root, app) {
 
   const dose = createDoseLesson({ root, app, h, say: (t) => say(t), stopVoice: () => stopVoice(), pauseVoice: () => pauseVoice(), resumeVoice: () => resumeVoice() });
   const doseBtn = (cls = 'big') => btn('📐 Dose', cls, () => dose.open(0));
+  const ativ = createActivities({ root, app, h, stopVoice: () => stopVoice(), dose, fwDo });
+  const ativBtn = (cls = 'big') => btn('📝 Atividade', cls, () => ativ.open());
   function btn(label, cls, fn) { const b = h('button', 'ui-btn ' + (cls || ''), label); b.onclick = fn; return b; }
   function setBar(items) { bar.innerHTML = ''; items.forEach((i) => i && bar.appendChild(i)); }
   // som: botão liga/desliga + barra de volume (máquinas, bipes, calibrador e narração)
@@ -155,7 +158,7 @@ export function createUI(root, app) {
     dash.classList.toggle('hidden', !['dosimetria', 'relatorio'].includes(p));
     if (p === 'explorar') {
       cap.classList.add('hidden');
-      setBar([soundBtn(), viewBtns(), btn('🎓 Demonstração', 'big', openDemoChooser), doseBtn(), btn('<span class="ic">◉</span> Dosímetro', 'primary big', () => startPresentation('tudo'))]);
+      setBar([soundBtn(), viewBtns(), btn('🎓 Demonstração', 'big', openDemoChooser), doseBtn(), ativBtn(), btn('<span class="ic">◉</span> Dosímetro', 'primary big', () => startPresentation('tudo'))]);
     } else if (p === 'apresentacao') {
       setBar([soundBtn(), btn('◀ Anterior', '', () => goStep(stepIdx - 1)), btn(`Próximo ▶`, 'primary', () => goStep(stepIdx + 1)),
         btn(demoClock.paused ? '▶ Continuar' : '❙❙ Pausar', 'ghost' + (demoClock.paused ? ' on' : ''), toggleDemoPause),
@@ -171,7 +174,7 @@ export function createUI(root, app) {
       const sp = h('div', 'ui-seg'); for (const s of [60, 240, 960]) { const b = btn(s + '×', 'seg' + (S.speed === s ? ' on' : ''), () => { app.setSpeed(s); render(); }); sp.appendChild(b); }
       setBar([soundBtn(), viewBtns(), h('span', 'ui-lbl', 'Velocidade'), sp, btn(S.running ? '❙❙ Pausar simulação' : '▶ Continuar', 'ghost', () => { S.running ? app.pauseDosimetry() : (S.running = true); render(); }), btn('■ Encerrar e pós-calibrar', 'danger', stopAndReport)]);
     } else if (p === 'relatorio') {
-      setBar([soundBtn(), btn('🎓 Demonstração', 'ghost', openDemoChooser), doseBtn('ghost'), btn('📄 Ver relatório', 'primary', showReport), btn('↺ Nova avaliação', 'ghost', () => location.reload())]);
+      setBar([soundBtn(), btn('🎓 Demonstração', 'ghost', openDemoChooser), doseBtn('ghost'), ativBtn('ghost'), btn('📄 Ver relatório', 'primary', showReport), btn('↺ Nova avaliação', 'ghost', () => location.reload())]);
     }
   }
   function showCaption(title, text, count) {

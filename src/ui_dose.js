@@ -13,7 +13,9 @@ export const DOSE_CASE = [
   { id: 'prensa4', n: 2, nome: 'Prensa hidráulica 150 t', L: 85, h: 4, color: '#ffca28', labelY: 3.6 },
 ];
 // pontos de medição com o decibelímetro (tripé no piso, microfone na altura do ouvido voltado para a máquina)
-const SPOTS = { m1: { pos: [-0.87, -0.62], src: [-1.3, -1.95], L: 90, dC: 2.6 }, m2: { pos: [-5.24, -1.92], src: [-6.8, -4.0], L: 85, dC: 3.8 } }; // dC: L(C) − L(A) — prensas têm energia em baixa frequência
+export const SPOTS = { m1: { pos: [-0.87, -0.62], src: [-1.3, -1.95], L: 90, dC: 2.6 }, m2: { pos: [-5.24, -1.92], src: [-6.8, -4.0], L: 85, dC: 3.8 },
+  m3: { pos: [0.85, -9.45], src: [-0.22, -10.1], L: 94, dC: 1.2 } }; // m3: esmerilhamento (atividade prática)
+{ const q = typeof location !== 'undefined' && new URLSearchParams(location.search).get('m3'); if (q) SPOTS.m3.pos = q.split(',').map(Number); } // dC: L(C) − L(A) — prensas têm energia em baixa frequência
 const C1 = DOSE_CASE[0].h * 60, C2 = DOSE_CASE[1].h * 60;
 const T1 = allowedMinutes(DOSE_CASE[0].L, CRITERIA.NHO01), T2 = allowedMinutes(DOSE_CASE[1].L, CRITERIA.NHO01);
 const d1 = C1 / T1, d2 = C2 / T2, D = (d1 + d2) * 100;
@@ -173,8 +175,9 @@ export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = ()
   // ── decibelímetro no tripé ──
   const slm = buildSLM(THREE); app.stage.scene.add(slm.group); let slmAt = null;
   // nível-alvo na ponderação escolhida: em C a prensa lê mais alto (baixas frequências); o tom de 1 kHz do calibrador é igual em A e C
-  let baseL = 0; const setRaw = slm.setTarget.bind(slm);
-  const levelFor = (L) => L + (slm.mode.weight === 'C' && !slm.mode.cal && slmAt && Math.abs(L - SPOTS[slmAt].L) < 0.01 ? SPOTS[slmAt].dC : 0);
+  let baseL = 0, rigErr = 0, rigOn = false; const setRaw = slm.setTarget.bind(slm);
+  // rigErr: erro de sensibilidade do medidor (atividade prática: só some depois de calibrar)
+  const levelFor = (L) => L + rigErr + (slm.mode.weight === 'C' && !slm.mode.cal && slmAt && Math.abs(L - (SPOTS[slmAt].Lact ?? SPOTS[slmAt].L)) < 0.01 ? SPOTS[slmAt].dC : 0);
   slm.setTarget = (L) => { baseL = L; setRaw(levelFor(L)); };
   const retarget = () => { if (baseL) setRaw(levelFor(baseL)); };
   // qualquer troca de ponderação/calibração (narração ou tecla) recalcula o alvo do visor
@@ -256,12 +259,13 @@ export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = ()
   });
   const v = new THREE.Vector3();
   app.stage.onFrame((dt, t) => {
-    if (!active) return;
-    if (!held) { actT += dt; while (cues.length && cues[0].t <= actT) cues.shift().fn(cueCtx); }
+    if (!active && !rigOn) return;
+    if (active && !held) { actT += dt; while (cues.length && cues[0].t <= actT) cues.shift().fn(cueCtx); }
     if (calTween) { const k = calTween; k.t = Math.min(1, k.t + dt / k.dur); k.c.group.position.y = k.from + (k.to - k.from) * ease(k.t);
       if (k.t >= 1) { calTween = null; if (k.to > 0.065) { k.c.group.visible = false; } } }
     scal.update(dt); slm.update(dt, t); drawSlmPanel(); const un = panel.querySelector('[data-unit]'); if (un) un.textContent = slm.unit ? slm.unit() : 'dB';
     const lv = panel.querySelector('[data-live]'); if (lv && slm.group.visible) lv.textContent = slm.reading.toFixed(1).replace('.', ',');
+    if (!active) return; // atividade prática: só o medidor/calibrador
     const cam = app.stage.camera, W = innerWidth, H = innerHeight;
     for (const m of marks) {
       const want = m.focusOn ? 1 : 0.28; m.on += (want - m.on) * Math.min(1, dt * 4);
@@ -379,5 +383,17 @@ export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = ()
     app.setView(prevView === 'orbit' ? 'ref' : prevView || 'ref', { animate: true, duration: 2 });
   }
   addEventListener('keydown', (e) => { if (active && e.key === 'Escape') close(); });
-  return { open, close, get active() { return active; } };
+  // ── decibelímetro, calibrador e câmeras para a atividade prática (atividade.js) ──
+  const rig = {
+    THREE, slm, scal, SPOTS, spotCam, headCam, couple, uncouple, calSet, solo,
+    get coupled() { return !!scal.group.visible && scal.group.parent === calAnchor && !calTween; },
+    get at() { return slmAt; },
+    /** liga/desliga o rig fora da aula (atualiza medidor, calibrador e o visor do canto) */
+    enable(b) { rigOn = !!b; slmPanel.classList.toggle('hidden', !b); slmRev = -1; if (!b) { calRelease(); slm.group.visible = false; slmAt = null; rigErr = 0; slm.setMode({ power: true, weight: 'A', resp: 'S', max: false, cal: false, range: '30–130' }); slm.setWindscreen?.(true); } },
+    place(key) { slm.group.visible = true; if (slmAt !== key) { slmAt = key; slm.placeAt(SPOTS[key].pos, SPOTS[key].src); } },
+    setErr(e) { rigErr = e; retarget(); }, get err() { return rigErr; },
+    target(L) { slm.setTarget(L); },
+    release: () => calRelease(),
+  };
+  return { open, close, get active() { return active; }, rig };
 }
