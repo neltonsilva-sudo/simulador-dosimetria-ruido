@@ -126,11 +126,16 @@ export function buildDosimeter(stage, fw, app) {
   const LW = 34.2, LH = 42.6, LY = 4.0, LT = 1.0;
   const lens = add(extrudeSmooth(roundRectArc(LW, LH, 1.4), LT, { bt: 0.45, bs: 0.7, seg: 1 }), lensMat, B, false);
   lens.position.set(0, LY, FRONT + LT / 2 - 0.1); const LENS_TOP = FRONT + LT - 0.1;
-  const tex = fw?.canvas ? new THREE.CanvasTexture(fw.canvas) : null;
-  if (tex) { tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8; }
+  // tela em ALTA RESOLUÇÃO: o mesmo desenho vetorial do painel "Visor do dosímetro" (fontes reais), 768×960 com mipmaps.
+  // ?lcdbmp=1 volta ao bitmap 128×160 ampliado com grade de pixels.
+  const HS = 6, useHi = !!fw?.drawHi && new URLSearchParams(location.search).get('lcdbmp') !== '1';
+  const hiCv = document.createElement('canvas'); hiCv.width = 128 * HS; hiCv.height = 160 * HS; const hiCtx = hiCv.getContext('2d');
+  const tex = fw?.canvas ? new THREE.CanvasTexture(useHi ? hiCv : fw.canvas) : null;
+  if (tex) { tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 16; if (useHi) { tex.generateMipmaps = true; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter; } }
+  if (useHi) { fw.drawHi(hiCtx, HS); try { document.fonts?.ready?.then(() => { fw.dirty = true; }); } catch {} }
   const scrMat = new THREE.MeshPhysicalMaterial({ color: 0x000000, roughness: 0.18, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 1.0,
     clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.4, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-  scrMat.onBeforeCompile = (sh) => {
+  if (!useHi) scrMat.onBeforeCompile = (sh) => { // grade de subpixels só no modo bitmap
     sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `
       #ifdef USE_EMISSIVEMAP
         vec4 emC = texture2D( emissiveMap, vEmissiveMapUv );
@@ -283,7 +288,7 @@ export function buildDosimeter(stage, fw, app) {
   const envTick = envGuard(stage, [bodyMat, bezMat, lensMat, scrMat, keyMat, capMat, clipMat, blackPl, colMat]);
   function update(dt = 0.016, t = performance.now() / 1000) {
     envTick();
-    if (tex && fw?.dirty) { tex.needsUpdate = true; fw.dirty = false; }
+    if (tex && fw?.dirty) { if (useHi) fw.drawHi(hiCtx, HS); tex.needsUpdate = true; fw.dirty = false; }
     // pressão longa ao vivo (3 s)
     const now = performance.now();
     for (const h of held.values()) if (!h.fired && now - h.t0 >= 3000) {
