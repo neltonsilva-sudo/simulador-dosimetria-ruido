@@ -159,9 +159,9 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
     panel.querySelector('[data-n="send"]').onclick = () => { if (confirm('Entregar a atividade e ver a nota?')) cur.submit(); };
     panel.classList.remove('hidden');
   }
-  function enter(cls) { stopVoice?.(); host.classList.add('ativ-on', cls); modal.classList.add('hidden'); }
+  function enter(cls) { stopVoice?.(); host.classList.add('ativ-on', cls); modal.classList.add('hidden'); app.audio?.setBed?.(0.35); } // ruído do galpão mais baixo durante a atividade
   function exit() {
-    if (!cur) return; cur.cleanup?.(); cur = null; sayTok++; stopVoice?.();
+    if (!cur) return; cur.cleanup?.(); cur = null; sayTok++; stopVoice?.(); app.audio?.setBed?.(1);
     host.classList.remove('ativ-on', 'ativ1', 'ativ2'); panel.classList.add('hidden'); panel.innerHTML = '';
     app.setView('ref', { animate: true, duration: 1.6 });
   }
