@@ -1,6 +1,6 @@
 // Interface + demonstração narrada — dono: UI/DEMO.
 // Fluxo: explorar → Dosímetro (apresentação: operar + calibrar) → colocar na trabalhadora → iniciar dosimetria → parar + pós-cal → relatório.
-import { STEPS, CHAPTERS, MOUNT_TEXT, fwDo } from './demo.js';
+import { STEPS, CHAPTERS, MOUNT_TEXT, fwDo, demoClock } from './demo.js';
 import { createDoseLesson } from './ui_dose.js';
 
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -155,6 +155,7 @@ export function createUI(root, app) {
       setBar([soundBtn(), viewBtns(), btn('🎓 Demonstração', 'big', openDemoChooser), doseBtn(), btn('<span class="ic">◉</span> Dosímetro', 'primary big', () => startPresentation('tudo'))]);
     } else if (p === 'apresentacao') {
       setBar([soundBtn(), btn('◀ Anterior', '', () => goStep(stepIdx - 1)), btn(`Próximo ▶`, 'primary', () => goStep(stepIdx + 1)),
+        btn(demoClock.paused ? '▶ Continuar' : '❙❙ Pausar', 'ghost' + (demoClock.paused ? ' on' : ''), toggleDemoPause),
         btn(voiceOn ? '🗣 Voz' : '🔈 Voz off', 'ghost', () => { voiceOn = !voiceOn; if (!voiceOn) stopVoice(); render(); }),
         btn('Pular demonstração ⏭', 'ghost', () => finishPresentation())]);
     } else if (p === 'pronto') {
@@ -196,20 +197,31 @@ export function createUI(root, app) {
     modal.querySelector('.ui-x').onclick = () => modal.classList.add('hidden');
     modal.querySelectorAll('.ui-chap').forEach((b) => (b.onclick = () => startPresentation(b.dataset.ch)));
   }
-  let token = 0;
+  let token = 0, resumeP = null;
+  // ❙❙ Pausar: congela a fala, as ações do aparelho e o avanço; ▶ Continuar retoma do mesmo ponto
+  const pwait = (ms) => new Promise((r) => { let left = ms, last = performance.now();
+    const tick = () => { const now = performance.now(); if (!demoClock.paused) left -= now - last; last = now; if (left <= 0) r(); else setTimeout(tick, 50); }; setTimeout(tick, 50); });
+  function toggleDemoPause() {
+    if (demoClock.paused) { demoClock.paused = false; resumeP = resumeVoice(); }
+    else { demoClock.paused = true; pauseVoice(); }
+    render();
+  }
   async function goStep(i) {
+    demoClock.paused = false; resumeP = null;
     if (i < 0) i = 0;
     if (i >= steps.length) return finishPresentation();
     const my = ++token; stepIdx = i; const st = steps[i]; render();
     showCaption(st.title, st.text, `${i + 1}/${steps.length}`);
     app.dosimeter?.highlight?.(st.highlight || null);
     const speech = say(st.say || st.text);
-    try { await st.run?.(app, { wait: (ms) => new Promise((r) => setTimeout(r, ms)), alive: () => my === token }); } catch (e) { console.error('[demo]', e); }
+    try { await st.run?.(app, { wait: pwait, alive: () => my === token }); } catch (e) { console.error('[demo]', e); }
     await speech;
-    if (my === token && st.auto !== false && S.phase === 'apresentacao') { await new Promise((r) => setTimeout(r, 900)); if (my === token) goStep(i + 1); }
+    while (my === token && demoClock.paused) await new Promise((r) => setTimeout(r, 100));   // pausado: espera o Continuar
+    if (resumeP) await resumeP;                                                                 // e a fala retomada terminar
+    if (my === token && st.auto !== false && S.phase === 'apresentacao') { await pwait(900); if (my === token) goStep(i + 1); }
   }
   async function finishPresentation() {
-    token++; stopVoice();
+    token++; stopVoice(); demoClock.paused = false;
     app.dosimeter?.highlight?.(null);
     await fwDo.ensureReady(app); // ligado + calibrado + espuma no lugar, calibrador guardado
     app.setPhase('pronto');

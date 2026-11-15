@@ -3,7 +3,11 @@
 import * as THREE from 'three';
 import { MENUS, PAGES } from './fw_core.js';
 
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+/** pausa da demonstração (botão ❙❙ Pausar da barra): as esperas entre as ações só contam o tempo fora da pausa */
+export const demoClock = { paused: false };
+const wait = (ms) => new Promise((r) => { let left = ms, last = performance.now();
+  const tick = () => { const now = performance.now(); if (!demoClock.paused) left -= now - last; last = now; if (left <= 0) r(); else setTimeout(tick, Math.min(50, Math.max(4, left))); };
+  setTimeout(tick, Math.min(50, ms)); });
 async function press(app, key, hold = 0, after = 450) {
   app.dosimeter?.pressAnim?.(key); app.fw?.press?.(key, hold); await wait(after);
 }
