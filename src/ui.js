@@ -74,8 +74,34 @@ export function createUI(root, app) {
   let vozMap = null, curAudio = null;
   fetch('assets/voz/manifest.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null)).then((m) => (vozMap = m)).catch(() => {});
   const fnv = (str) => { let x = 0x811c9dc5; for (const b of new TextEncoder().encode(str)) x = Math.imul(x ^ b, 0x01000193) >>> 0; return x.toString(16).padStart(8, '0'); };
-  function stopVoice() { try { speechSynthesis.cancel(); } catch {} if (curAudio) { try { curAudio.pause(); } catch {} curAudio = null; } }
+  function stopVoice() { synthPaused = false; try { speechSynthesis.cancel(); } catch {} if (curAudio) { try { curAudio.pause(); } catch {} curAudio = null; } }
   const usingRecorded = () => !!vozMap;
+  // pausa/retomada da narração (aula da Dose): pauseVoice() congela o áudio; resumeVoice() continua e resolve ao terminar
+  let synthPaused = false;
+  function pauseVoice() {
+    if (curAudio && !curAudio.paused && !curAudio.ended) { try { curAudio.pause(); } catch {} return true; }
+    try { if (speechSynthesis.speaking && !speechSynthesis.paused) { speechSynthesis.pause(); synthPaused = true; return true; } } catch {}
+    return false;
+  }
+  function resumeVoice() {
+    return new Promise((res) => {
+      const a = curAudio;
+      if (a && a.paused && !a.ended) {
+        let done = false; const fin = () => { if (!done) { done = true; res(true); } };
+        a.addEventListener('ended', fin, { once: true }); a.addEventListener('error', fin, { once: true });
+        const left = isFinite(a.duration) ? a.duration - a.currentTime : 20;
+        setTimeout(fin, (left + 2) * 1000);
+        a.play().catch(fin); return;
+      }
+      if (synthPaused) {
+        synthPaused = false; try { speechSynthesis.resume(); } catch {}
+        const t0 = performance.now();
+        const poll = () => { let sp = false; try { sp = speechSynthesis.speaking; } catch {} if (!sp || performance.now() - t0 > 30000) res(true); else setTimeout(poll, 250); };
+        return void setTimeout(poll, 300);
+      }
+      res(false);
+    });
+  }
   function say(text) {
     return new Promise((res) => {
       stopVoice();
@@ -99,7 +125,7 @@ export function createUI(root, app) {
     });
   }
 
-  const dose = createDoseLesson({ root, app, h, say: (t) => say(t), stopVoice: () => stopVoice() });
+  const dose = createDoseLesson({ root, app, h, say: (t) => say(t), stopVoice: () => stopVoice(), pauseVoice: () => pauseVoice(), resumeVoice: () => resumeVoice() });
   const doseBtn = (cls = 'big') => btn('📐 Dose', cls, () => dose.open(0));
   function btn(label, cls, fn) { const b = h('button', 'ui-btn ' + (cls || ''), label); b.onclick = fn; return b; }
   function setBar(items) { bar.innerHTML = ''; items.forEach((i) => i && bar.appendChild(i)); }

@@ -119,7 +119,7 @@ const CAMS = {
   m2: { pos: [-2.4, 2.7, 1.8], target: [-5.4, 1.5, -4.8], fov: 50 },
 };
 
-export function createDoseLesson({ root, app, h, say, stopVoice }) {
+export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = () => false, resumeVoice = async () => false }) {
   const THREE = app.stage.THREE;
   const host = root.parentElement ? root : document.body;
   let active = false, idx = 0, token = 0, auto = true, prevView = null;
@@ -176,14 +176,14 @@ export function createDoseLesson({ root, app, h, say, stopVoice }) {
     panel.innerHTML = `<div class="dz-h"><span>📐 Dose de ruído · passo ${idx + 1}/${DOSE_STEPS.length}</span><button class="ui-x dz-x" title="Fechar">✕</button></div>
       <h3>${st.title}</h3><p class="dz-p">${st.text}</p><div class="dz-calc">${st.html()}</div>
       <div class="dz-dots">${DOSE_STEPS.map((s, i) => `<button data-i="${i}" class="${i === idx ? 'on' : i < idx ? 'done' : ''}" title="${s.title}"></button>`).join('')}</div>
-      <div class="dz-nav"><button class="ui-btn" data-a="prev">◀ Anterior</button><button class="ui-btn ghost" data-a="auto">${auto ? '⏸ Pausar' : '▶ Automático'}</button>
+      <div class="dz-nav"><button class="ui-btn" data-a="prev">◀ Anterior</button><button class="ui-btn ghost" data-a="auto">${auto ? '⏸ Pausar' : '▶ Continuar'}</button>
         <button class="ui-btn ghost" data-a="rep">🔁 Ouvir</button><button class="ui-btn primary" data-a="next">${idx === DOSE_STEPS.length - 1 ? 'Concluir ✓' : 'Próximo ▶'}</button></div>`;
     panel.querySelector('.dz-x').onclick = close;
     panel.querySelectorAll('.dz-dots button').forEach((b) => (b.onclick = () => go(+b.dataset.i)));
     panel.querySelectorAll('.dz-nav button').forEach((b) => (b.onclick = () => {
       const a = b.dataset.a;
       if (a === 'prev') go(idx - 1); else if (a === 'next') (idx === DOSE_STEPS.length - 1 ? close() : go(idx + 1));
-      else if (a === 'rep') go(idx); else if (a === 'auto') { auto = !auto; paint(); }
+      else if (a === 'rep') go(idx); else if (a === 'auto') { auto = !auto; if (auto) resume(); else pauseVoice(); paint(); }
     }));
     panel.scrollTop = 0;
   }
@@ -204,6 +204,14 @@ export function createDoseLesson({ root, app, h, say, stopVoice }) {
     await say(st.text);
     if (my !== token || !active || !auto || idx >= DOSE_STEPS.length - 1) return;
     await new Promise((r) => setTimeout(r, 1400));
+    if (my === token && active && auto) go(idx + 1);
+  }
+  // ▶ Continuar: retoma a fala de onde parou e, ao terminar, segue para o próximo passo
+  async function resume() {
+    const my = token;
+    const wasPaused = await resumeVoice();
+    if (my !== token || !active || !auto || idx >= DOSE_STEPS.length - 1) return;
+    await new Promise((r) => setTimeout(r, wasPaused ? 1400 : 600));
     if (my === token && active && auto) go(idx + 1);
   }
   function open(start = 0) {
