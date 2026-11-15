@@ -177,6 +177,8 @@ export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = ()
   const levelFor = (L) => L + (slm.mode.weight === 'C' && !slm.mode.cal && slmAt && Math.abs(L - SPOTS[slmAt].L) < 0.01 ? SPOTS[slmAt].dC : 0);
   slm.setTarget = (L) => { baseL = L; setRaw(levelFor(L)); };
   const retarget = () => { if (baseL) setRaw(levelFor(baseL)); };
+  // qualquer troca de ponderação/calibração (narração ou tecla) recalcula o alvo do visor
+  const setModeRaw = slm.setMode.bind(slm); slm.setMode = (o = {}) => { setModeRaw(o); if ('weight' in o || 'cal' in o) retarget(); };
   const tmpV = new THREE.Vector3();
   function spotCam(key, close) {
     const sp = SPOTS[key]; const bx = sp.pos[0] - sp.src[0], bz = sp.pos[1] - sp.src[1], bl = Math.hypot(bx, bz), b = [bx / bl, bz / bl], sd = [-b[1], b[0]];

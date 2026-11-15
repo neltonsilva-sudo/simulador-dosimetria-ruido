@@ -228,3 +228,9 @@
 /* botões da aula sempre visíveis (passos longos rolam por baixo) */
 .ui-dose .dz-nav { position:sticky; bottom:-18px; margin:0 -24px -18px; padding:10px 24px 14px; background:linear-gradient(rgba(28,32,38,.0), rgba(28,32,38,.96) 30%); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); z-index:2; }
 @media (max-width: 760px) { .ui-dose .dz-nav { bottom:-14px; margin:0 -18px -14px; padding:8px 18px 12px; } }
+/* cartões das teclas (configuração): tecla em cima, rótulo e valor embaixo — o texto não sai do cartão */
+.ui-dose .dz-keys { grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); }
+.ui-dose .dz-keys > div { display:flex; flex-direction:column; align-items:flex-start; gap:5px; min-width:0; overflow:hidden; }
+.ui-dose .dz-keys kbd { grid-row:auto; }
+.ui-dose .dz-keys span, .ui-dose .dz-keys b { max-width:100%; overflow-wrap:anywhere; line-height:1.2; }
+@media (max-width: 760px) { .ui-dose .dz-keys { grid-template-columns:repeat(auto-fill, minmax(110px, 1fr)); } }
