@@ -253,7 +253,7 @@ export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = ()
     if (!held) { actT += dt; while (cues.length && cues[0].t <= actT) cues.shift().fn(cueCtx); }
     if (calTween) { const k = calTween; k.t = Math.min(1, k.t + dt / k.dur); k.c.group.position.y = k.from + (k.to - k.from) * ease(k.t);
       if (k.t >= 1) { calTween = null; if (k.to > 0.065) { k.c.group.visible = false; } } }
-    scal.update(dt); slm.update(dt, t); const un = panel.querySelector('[data-unit]'); if (un) un.textContent = slm.unit ? slm.unit() : 'dB';
+    scal.update(dt); slm.update(dt, t); drawSlmPanel(); const un = panel.querySelector('[data-unit]'); if (un) un.textContent = slm.unit ? slm.unit() : 'dB';
     const lv = panel.querySelector('[data-live]'); if (lv && slm.group.visible) lv.textContent = slm.reading.toFixed(1).replace('.', ',');
     const cam = app.stage.camera, W = innerWidth, H = innerHeight;
     for (const m of marks) {
@@ -274,6 +274,29 @@ export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = ()
   // ── painel ──
   const panel = h('div', 'ui-dose glass hidden', '');
   host.appendChild(panel);
+  // ── visor do decibelímetro ampliado no canto esquerdo (como o "Visor do dosímetro") ──
+  const SLM_KEYS = [['power', '⏻', 'pw'], ['fs', 'F/S'], ['ac', 'A/C'], ['maxmin', 'MAX/MIN'], ['level', 'LEVEL']];
+  const slmPanel = h('div', 'ui-slmlcd glass hidden', `<div class="ui-cap">Visor do decibelímetro</div>`);
+  const LDPR = Math.min(3, Math.max(1, window.devicePixelRatio || 1));
+  const slmCv = h('canvas'); slmCv.width = Math.round(256 * LDPR); slmCv.height = Math.round(240 * LDPR); slmPanel.appendChild(slmCv);
+  const slmCtx = slmCv.getContext('2d');
+  const slmInfo = h('div', 'sl-info', ''); slmPanel.appendChild(slmInfo);
+  const slmKeys = h('div', 'sl-keys', SLM_KEYS.map(([k, t, c]) => `<span data-sk="${k}" class="${c || ''}">${t}</span>`).join('')); slmPanel.appendChild(slmKeys);
+  host.appendChild(slmPanel);
+  let slmRev = -1, slmHi = undefined, slmInfoTxt = '';
+  function drawSlmPanel() {
+    if (slmPanel.classList.contains('hidden')) return;
+    if (slm.lcdCanvas && slm.lcdRev !== slmRev) {
+      slmRev = slm.lcdRev; const W = slmCv.width, H = slmCv.height;
+      slmCtx.drawImage(slm.lcdCanvas, 0, 0, W, H);
+      const g = slmCtx.createLinearGradient(0, 0, W * 0.6, H); g.addColorStop(0, 'rgba(255,255,255,0.10)'); g.addColorStop(0.35, 'rgba(255,255,255,0.02)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      slmCtx.fillStyle = g; slmCtx.fillRect(0, 0, W, H);
+    }
+    const hi = slm.highlighted ?? null;
+    if (hi !== slmHi) { slmHi = hi; slmKeys.querySelectorAll('[data-sk]').forEach((e) => e.classList.toggle('on', e.dataset.sk === hi)); }
+    const m = slm.mode || {}, info = !m.power ? 'Desligado' : `Ponderação ${m.weight || 'A'} · resposta ${m.resp === 'F' ? 'rápida (FAST)' : 'lenta (SLOW)'}${m.max ? ' · MAX' : ''}${m.cal ? ' · CAL' : ''}`;
+    if (info !== slmInfoTxt) { slmInfoTxt = info; slmInfo.textContent = info; }
+  }
   function paint() {
     const st = DOSE_STEPS[idx];
     panel.innerHTML = `<div class="dz-h"><span>📐 Dose de ruído · passo ${idx + 1}/${DOSE_STEPS.length}</span><button class="ui-x dz-x" title="Fechar">✕</button></div>
@@ -297,6 +320,7 @@ export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = ()
     if (!active) return; i = Math.max(0, Math.min(DOSE_STEPS.length - 1, i));
     const my = ++token; idx = i; const st = DOSE_STEPS[i]; marked.clear(); paint();
     held = false; resetRig(); st.init?.(slm);
+    slmPanel.classList.toggle('hidden', !(st.meter && ['meter', 'spot', 'head'].includes(st.cam))); slmRev = -1;
     actT = 0; cues = (st.cues || []).map(([mk, fn]) => ({ t: Math.max(0, st.text.indexOf(mk)) * (st.dur ? st.dur / st.text.length : 1 / CPS), fn })).sort((a, b) => a.t - b.t);
     for (const m of marks) m.focusOn = !st.focus || st.focus === m.c.id;
     solo(st.solo);
@@ -328,7 +352,7 @@ export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = ()
     go(start);
   }
   function close() {
-    if (!active) return; active = false; token++; stopVoice(); cues = []; resetRig();
+    if (!active) return; active = false; token++; stopVoice(); cues = []; resetRig(); slmPanel.classList.add('hidden');
     host.classList.remove('dose-on'); panel.classList.add('hidden'); group.visible = false; slm.group.visible = false; slmAt = null;
     for (const m of marks) m.lbl.classList.add('hidden');
     app.audio?.setRunning?.(app.running());

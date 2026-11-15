@@ -229,7 +229,8 @@ export function buildSLM(THREE) {
   const mode = { power: true, weight: 'A', resp: 'S', max: false, cal: false };
   let reading = 0, target = 0, shown = '', redrawT = 0, bootT = 0, maxHold = 0, dirty = true, hiKey = null, hiT = 0;
   const lcdState = () => ({ val: mode.max ? Math.max(maxHold, reading) : reading, power: mode.power, boot: bootT > 0, weight: mode.weight, resp: mode.resp, max: mode.max, cal: mode.cal });
-  const drawLCD = () => { LCD.draw(lcdState()); shown = lcdState().val.toFixed(1); dirty = false; };
+  let lcdRev = 0; // conta redesenhos do LCD (o painel da interface copia o canvas só quando muda)
+  const drawLCD = () => { LCD.draw(lcdState()); shown = lcdState().val.toFixed(1); dirty = false; lcdRev++; };
   drawLCD();
 
   return {
@@ -242,6 +243,8 @@ export function buildSLM(THREE) {
     lcdWorld(v = new THREE.Vector3()) { return lcd.getWorldPosition(v); },
     get reading() { return reading; },
     get mode() { return { ...mode }; },
+    /** canvas do LCD (768×720) e contador de redesenho — para o painel "Visor do decibelímetro" da interface */
+    lcdCanvas: LCD.tex.image, get lcdRev() { return lcdRev; }, get highlighted() { return hiKey; },
     /** muda o estado do aparelho: { power, weight:'A'|'C', resp:'F'|'S', max, cal } — campos opcionais */
     setMode(o = {}) {
       if (o.power !== undefined && !!o.power !== mode.power) { mode.power = !!o.power; if (mode.power) { bootT = 0.6; reading = 0; } }
