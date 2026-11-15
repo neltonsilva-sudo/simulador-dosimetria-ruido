@@ -137,6 +137,7 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
     const TABS = ['Configurar', 'Calibrar', 'Medir', 'Calcular', 'Parecer'];
     enter('ativ1');
     rig.enable(true); rig.place('m1'); rig.setErr(err0);
+    if (/[?&]debug=1/.test(location.search)) window.__rig = rig; // testes automatizados
     rig.slm.setMode({ power: true, weight: 'C', resp: 'F', max: true, cal: false, range: '80–130' }); // configuração "errada" de fábrica: o aluno ajusta
     rig.solo(['prensa1']); app.audio?.start?.();
     cur = { kind: 1, tab: 0, done: {}, S };
@@ -189,6 +190,11 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
         <h4>Medidas recomendadas</h4><div class="ativ-check">${MEAS.map(([k, l]) => `<label><input type="checkbox" data-in="meas" value="${k}"> ${l}</label>`).join('')}</div>
         <label class="ativ-text">Parecer técnico<textarea data-in="texto" rows="3"></textarea></label>`;
       frame({ title: 'Atividade 1 · Decibelímetro', tabs: TABS, tab: t, body, caseHtml: caseHtml() });
+      // calibração só ANTES da 1ª medição: depois de registrar a primeira leitura ela fica encerrada e vale para as demais
+      if (t === 1 && S.firstRegErr) {
+        panel.querySelectorAll('.ativ-act [data-a]').forEach((b) => { if (!(b.dataset.a === 'foam' && !S.foam && b.textContent.includes('Recolocar'))) b.disabled = true; });
+        panel.querySelector('.ativ-act').insertAdjacentHTML('beforebegin', '<p class="ativ-lock">🔒 Calibração encerrada — a calibração feita antes da 1ª medição vale para as demais medições.</p>');
+      }
       bindInputs(S.ans);
       panel.querySelectorAll('[data-a]').forEach((b) => (b.onclick = () => act(b.dataset.a)));
       panel.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => goSpot(b.dataset.go)));
@@ -197,6 +203,7 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
     }
     function act(a) {
       const sc = rig.scal;
+      if (S.firstRegErr && a !== 'foam') return warn('Ação não permitida neste momento.');
       if (a === 'foam') { if (!S.foam && rig.coupled) return warn('Ação não permitida neste momento.'); S.foam = !S.foam; rig.slm.setWindscreen(S.foam); }
       else if (a === 'couple') {
         if (rig.coupled) { if (sc.isOn()) rig.calSet(0); rig.uncouple(); } // desliga o calibrador ao retirar
