@@ -2,6 +2,7 @@
 // Pintura industrial sobre ferro fundido: lascas mostrando metal, ferrugem com escorrimento, óleo, graxa, riscos,
 // poeira em superfícies horizontais (shader, pela normal do mundo), sujeira junto ao piso, bordas gastas (atributo aEdge).
 import * as THREE from 'three';
+export const MODERN = (() => { try { return new URLSearchParams(location.search).get('antigo') !== '1'; } catch { return true; } })(); // máquinas modernas (NR-12); ?antigo=1 volta às antigas
 export const CLEAN = (() => { try { return new URLSearchParams(location.search).get('sujo') !== '1'; } catch { return true; } })(); // galpão limpo e organizado (5S); ?sujo=1 volta ao aspecto antigo
 
 // ───────────────────────── ruído tileável ─────────────────────────
@@ -247,6 +248,22 @@ export const SCHEMES = {
   blue: { paint: 0x3f6e9a, grime: 0x1f2a33, wear: 0.8 },
   dkgreen: { paint: 0x3f5a45, grime: 0x1e241e, wear: 1.0 },
 };
+// máquinas modernas: cinza-claro industrial (RAL 7035) com detalhes azuis (RAL 5015), base grafite, pintura nova
+if (MODERN) Object.assign(SCHEMES, {
+  press1: { paint: 0xd9dcdb, grime: 0x3a3d40, primer: 0xa0a4a6, wear: 0.2, dirt: 0.4, oil: 0.2 },
+  press2: { paint: 0xd4d8d8, grime: 0x3a3d40, primer: 0xa0a4a6, wear: 0.2, dirt: 0.4, oil: 0.2 },
+  press3: { paint: 0xcfd5d7, grime: 0x3a3d40, primer: 0xa0a4a6, wear: 0.2, dirt: 0.4, oil: 0.2 },
+  hyd: { paint: 0x2364ad, grime: 0x1a2430, wear: 0.15, dirt: 0.3, oil: 0.2 },
+  sage: { paint: 0xd9dcdb, grime: 0x3a3d40, primer: 0xa0a4a6, wear: 0.15, dirt: 0.3, oil: 0.1 },
+  pendant: { paint: 0x353a40, grime: 0x15171a, wear: 0.1, dirt: 0.2, oil: 0.1 },
+  olive: { paint: 0x3a4047, grime: 0x15171a, wear: 0.15, dirt: 0.3, oil: 0.1 },
+  dkgreen: { paint: 0x2364ad, grime: 0x1a2430, wear: 0.1, dirt: 0.3, oil: 0.1 },
+  grey: { paint: 0xbfc3c5, grime: 0x2a2b2c, wear: 0.1, dirt: 0.3 },
+  blue: { paint: 0x2364ad, grime: 0x1a2430, wear: 0.1, dirt: 0.3 },
+});
+SCHEMES.accent = { paint: 0x2364ad, grime: 0x1a2430, wear: 0.1, dirt: 0.3, oil: 0.1 };
+SCHEMES.graphite = { paint: 0x3a4047, grime: 0x15171a, wear: 0.1, dirt: 0.3, oil: 0.1 };
+
 const cache = new Map();
 /** material compartilhado por chave */
 export function mat(key) {
@@ -254,9 +271,14 @@ export function mat(key) {
   let m;
   if (SCHEMES[key]) {
     const M = paintMasks || buildPaintMasks();
+    if (MODERN) { // pintura eletrostática nova: lisa, acetinada, sem amassados/lascas
+      m = new THREE.MeshPhysicalMaterial({ map: paintAlbedo(SCHEMES[key]), roughness: 0.4, metalness: 0.05, clearcoat: 0.25, clearcoatRoughness: 0.35 });
+      // (sem a camada de desgaste: ela exige roughnessMap)
+    } else {
     m = new THREE.MeshStandardMaterial({ map: paintAlbedo(SCHEMES[key]), normalMap: M.normal, roughnessMap: M.orm, metalnessMap: M.orm, roughness: 1, metalness: 1 });
     m.normalScale.set(0.5, 0.5);
     addWear(m, { dust: key === 'yellow' || key === 'orange' ? 0.4 : 0.6, edge: 1 });
+    }
   } else if (key === 'steel' || key === 'dksteel' || key === 'chrome' || key === 'blacksteel') {
     const S = steelTex || buildSteel();
     const col = { steel: 0xffffff, dksteel: 0x6a6a6c, chrome: 0xffffff, blacksteel: 0x2b2c2e }[key];
@@ -273,6 +295,9 @@ export function mat(key) {
   else if (key === 'green') m = new THREE.MeshStandardMaterial({ color: 0x1a8a2e, roughness: 0.35, metalness: 0 });
   else if (key === 'blackplastic') m = new THREE.MeshStandardMaterial({ color: 0x161616, roughness: 0.45, metalness: 0 });
   else if (key === 'greyplastic') m = new THREE.MeshStandardMaterial({ color: 0x7c7f80, roughness: 0.5, metalness: 0 });
+  else if (key === 'ledG' || key === 'ledA' || key === 'ledR') { const c = { ledG: 0x22e36a, ledA: 0xffb21a, ledR: 0xff2a2a }[key]; m = new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: key === 'ledG' ? 2.2 : 0.18, roughness: 0.25, transparent: true, opacity: 0.92 }); }
+  else if (key === 'curtain') m = new THREE.MeshStandardMaterial({ color: 0x3a0606, emissive: 0xff1e1e, emissiveIntensity: 0.9, roughness: 0.3 });
+  else if (key === 'poly') m = new THREE.MeshPhysicalMaterial({ color: 0xdfe8ee, roughness: 0.06, metalness: 0, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide });
   else if (key === 'wheel') m = new THREE.MeshStandardMaterial({ color: 0x77736c, roughness: 0.95, metalness: 0 });
   else if (key === 'glass') m = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.08, metalness: 0, transmission: 0, transparent: true, opacity: 0.18, depthWrite: false });
   else if (key === 'oilglass') m = new THREE.MeshStandardMaterial({ color: 0xa8761a, roughness: 0.15, metalness: 0, transparent: true, opacity: 0.85 });
@@ -291,8 +316,9 @@ export function preparePaint() { buildPaintMasks(); buildSteel(); }
 // ───────────────────────── etiquetas / plaquetas (canvas) ─────────────────────────
 export function labelTex(draw, w = 512, h = 256) {
   const c = canvas(w, h), x = c.getContext('2d'); draw(x, w, h);
-  // envelhecimento: sujeira nas bordas + manchas
+  // envelhecimento: sujeira nas bordas + manchas (só no aspecto antigo)
   const r = rng(w * 7 + h);
+  if (MODERN || CLEAN) { const t0 = tex(c, true, false); t0.anisotropy = 4; return t0; }
   const g = x.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.2, w / 2, h / 2, Math.max(w, h) * 0.75);
   g.addColorStop(0, 'rgba(40,34,20,0)'); g.addColorStop(1, 'rgba(40,34,20,0.55)'); x.fillStyle = g; x.fillRect(0, 0, w, h);
   for (let i = 0; i < 40; i++) { x.fillStyle = `rgba(30,25,15,${0.04 + r() * 0.08})`; x.beginPath(); x.arc(r() * w, r() * h, 3 + r() * 30, 0, 7); x.fill(); }

@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MACHINES } from './layout_machines.js';
-import { mat, idPlate, safetySign, labelMat } from './mach_tex.js';
+import { mat, idPlate, safetySign, labelMat, MODERN } from './mach_tex.js';
 
 // ── geometria utilitária: UV por projeção em caixa (densidade constante) + atributo de borda (desgaste) ──
 function prep(geo, edge = true, scale = 1 / 1.1) {
@@ -37,6 +37,48 @@ function bolt(parent, x, y, z, nx = 0, ny = 0, nz = 1, s = 1) {
 }
 
 // ── prensa excêntrica C ──
+// ── acessórios de máquina moderna (NR-12): cortina de luz, proteções laterais em policarbonato, torre de sinalização, IHM touch ──
+let hmiTexture = null;
+function hmiTex() {
+  if (hmiTexture) return hmiTexture;
+  const c = document.createElement('canvas'); c.width = 512; c.height = 384; const x = c.getContext('2d');
+  x.fillStyle = '#0f151c'; x.fillRect(0, 0, 512, 384); x.fillStyle = '#2364ad'; x.fillRect(0, 0, 512, 40);
+  x.fillStyle = '#fff'; x.font = '600 20px Arial'; x.fillText('PRENSA SERVO · AUTO', 14, 27); x.fillStyle = '#22e36a'; x.beginPath(); x.arc(486, 20, 8, 0, 7); x.fill();
+  const tile = (tx, ty, w, h, label, val, col) => { x.fillStyle = '#1a232d'; x.beginPath(); x.roundRect(tx, ty, w, h, 10); x.fill(); x.fillStyle = '#8fa3b5'; x.font = '15px Arial'; x.fillText(label, tx + 12, ty + 24); x.fillStyle = col; x.font = 'bold 34px Arial'; x.fillText(val, tx + 12, ty + 66); };
+  tile(14, 54, 154, 86, 'CADÊNCIA', '40 gpm', '#fff'); tile(180, 54, 154, 86, 'OEE', '87 %', '#22e36a'); tile(346, 54, 152, 86, 'FORÇA', '62 t', '#ffd34a');
+  x.fillStyle = '#1a232d'; x.beginPath(); x.roundRect(14, 152, 484, 160, 10); x.fill(); x.strokeStyle = '#3fa0ff'; x.lineWidth = 3; x.beginPath();
+  for (let i = 0; i <= 120; i++) { const t = i / 120, X = 30 + t * 450, Y = 290 - Math.max(0, Math.sin(t * Math.PI * 3) ** 8) * 110 - 8; i ? x.lineTo(X, Y) : x.moveTo(X, Y); } x.stroke();
+  x.fillStyle = '#8fa3b5'; x.font = '14px Arial'; x.fillText('Curva força × curso', 26, 174);
+  ['INÍCIO', 'RECEITA', 'ALARMES', 'MANUT.'].forEach((t, i) => { x.fillStyle = i ? '#1f2a36' : '#2364ad'; x.beginPath(); x.roundRect(14 + i * 123, 324, 115, 46, 8); x.fill(); x.fillStyle = '#fff'; x.font = '600 16px Arial'; x.fillText(t, 30 + i * 123, 353); });
+  hmiTexture = new THREE.CanvasTexture(c); hmiTexture.colorSpace = THREE.SRGBColorSpace; hmiTexture.anisotropy = 4; return hmiTexture;
+}
+function hmi(parent, x, y, z, ry = 0, s = 1) {
+  const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry; g.scale.setScalar(s); parent.add(g);
+  M(g, rb(0.36, 0.27, 0.05, 0.015), 'graphite', 0, 0, 0);
+  const sc = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.24), new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffffff, emissiveMap: hmiTex(), emissiveIntensity: 0.55, roughness: 0.12 }));
+  sc.position.z = 0.0255; sc.userData.noAO = true; g.add(sc);
+  return g;
+}
+function signalTower(parent, x, y, z) {
+  M(parent, cyl(0.03, 0.035, 0.03), 'graphite', x, y + 0.015, z, { edge: false });
+  M(parent, cyl(0.012, 0.012, 0.16), 'chrome', x, y + 0.11, z, { edge: false });
+  ['ledR', 'ledA', 'ledG'].forEach((k, i) => M(parent, cyl(0.035, 0.035, 0.07, 20), k, x, y + 0.42 - i * 0.075, z, { edge: false, shadow: false }));
+  M(parent, cyl(0.035, 0.032, 0.03, 20), 'graphite', x, y + 0.21, z, { edge: false });
+  M(parent, cyl(0.03, 0.035, 0.02, 20), 'graphite', x, y + 0.465, z, { edge: false });
+}
+function lightCurtain(parent, x0, x1, y0, y1, z) {
+  for (const x of [x0, x1]) {
+    M(parent, rb(0.045, y1 - y0, 0.04, 0.008), 'yellow', x, (y0 + y1) / 2, z);
+    M(parent, new THREE.BoxGeometry(0.012, y1 - y0 - 0.06, 0.004), 'curtain', x + (x < 0 ? 0.023 : -0.023), (y0 + y1) / 2, z, { edge: false, shadow: false });
+    M(parent, rb(0.07, 0.03, 0.06, 0.006), 'graphite', x, y0 - 0.015, z);
+  }
+}
+function polyGuard(parent, x, y0, y1, z0, z1) {
+  const h = y1 - y0, d = z1 - z0, y = (y0 + y1) / 2, z = (z0 + z1) / 2;
+  M(parent, new THREE.BoxGeometry(0.006, h - 0.04, d - 0.04), 'poly', x, y, z, { edge: false, shadow: false });
+  for (const [yy, hh, dd, zz] of [[y0, 0.03, d, z], [y1, 0.03, d, z]]) M(parent, rb(0.03, hh, dd, 0.006), 'yellow', x, yy, zz);
+  for (const zz of [z0, z1]) M(parent, rb(0.03, h, 0.03, 0.006), 'yellow', x, y, zz);
+}
 function buildPress(def, scheme, s = 1) {
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body); body.scale.setScalar(s);
   // perfil C do corpo fundido (z,y)
@@ -93,9 +135,10 @@ function buildPress(def, scheme, s = 1) {
   M(fly, cyl(0.09, 0.09, 0.18), 'blacksteel', 0, 0, 0, { rz: Math.PI / 2, edge: false });
   for (let k = 0; k < 6; k++) M(fly, rb(0.05, 0.4, 0.07, 0.02), scheme, 0, 0, 0, { rx: (k / 6) * Math.PI * 2 }).geometry.translate(0, 0.25, 0);
   // proteção fechada do volante em chapa/fundido pintado (sem grade), com friso amarelo e parafusos na tampa
-  M(body, cyl(0.56, 0.56, 0.17, 56), scheme, -0.62, 2.18, 0.12, { rz: Math.PI / 2, edge: false });
-  M(body, cyl(0.5, 0.52, 0.03, 56), scheme, -0.715, 2.18, 0.12, { rz: Math.PI / 2, edge: false });
-  M(body, cyl(0.13, 0.15, 0.05, 32), scheme, -0.75, 2.18, 0.12, { rz: Math.PI / 2, edge: false });
+  const guardK = MODERN ? 'accent' : scheme;
+  M(body, cyl(0.56, 0.56, 0.17, 56), guardK, -0.62, 2.18, 0.12, { rz: Math.PI / 2, edge: false });
+  M(body, cyl(0.5, 0.52, 0.03, 56), guardK, -0.715, 2.18, 0.12, { rz: Math.PI / 2, edge: false });
+  M(body, cyl(0.13, 0.15, 0.05, 32), guardK, -0.75, 2.18, 0.12, { rz: Math.PI / 2, edge: false });
   M(body, new THREE.TorusGeometry(0.555, 0.012, 6, 64), 'yellow', -0.705, 2.18, 0.12, { ry: Math.PI / 2, edge: false, shadow: false });
   for (let k = 0; k < 10; k++) { const a = (k / 10) * Math.PI * 2; bolt(body, -0.73, 2.18 + Math.sin(a) * 0.47, 0.12 + Math.cos(a) * 0.47, -1, 0, 0); }
   for (let k = 0; k < 4; k++) { const a = (k / 4) * Math.PI * 2 + 0.4; bolt(body, -0.775, 2.18 + Math.sin(a) * 0.1, 0.12 + Math.cos(a) * 0.1, -1, 0, 0, 0.8); }
@@ -115,8 +158,17 @@ function buildPress(def, scheme, s = 1) {
   M(body, cyl(0.008, 0.005, 0.07, 8), 'brass', 0.18, 1.09, 0.36, { edge: false, shadow: false });
   // painel elétrico lateral
   M(body, rb(0.1, 0.5, 0.36), 'grey', 0.46, 1.35, -0.25);
+  if (MODERN) {
+    lightCurtain(body, -0.43, 0.43, 0.92, 1.62, 0.52);                     // cortina de luz na zona de prensagem
+    for (const sx of [-1, 1]) polyGuard(body, sx * 0.47, 0.9, 1.78, -0.18, 0.46); // proteções laterais fixas em policarbonato
+    signalTower(body, 0.3, 2.63, 0.28);                                     // torre de sinalização (verde = produzindo)
+    M(body, cyl(0.016, 0.016, 0.42), 'graphite', 0.62, 1.86, 0.32, { rz: 0.9, edge: false });  // braço da IHM
+    hmi(body, 0.82, 1.62, 0.5, -0.5);
+    M(body, rb(0.22, 0.6, 0.5, 0.02), 'grey', 0.6, 1.05, -0.45);            // quadro de comando/servo
+    M(body, new THREE.BoxGeometry(0.004, 0.5, 0.012), 'accent', 0.711, 1.05, -0.24, { edge: false, shadow: false });
+  }
   // plaquetas
-  const pl = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.11), idPlate([def.name.toUpperCase(), 'Nº SÉRIE 0' + (127 + def.pos[2] * -3 | 0) + '  ANO 1979', 'CURSO 100 mm  •  ' + (def.spm || 40) + ' gpm', 'MOTOR 7,5 cv  380 V  60 Hz']));
+  const pl = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.11), idPlate([def.name.toUpperCase(), 'Nº SÉRIE 0' + (127 + def.pos[2] * -3 | 0) + '  ANO ' + (MODERN ? '2024' : '1979'), 'CURSO 100 mm  •  ' + (def.spm || 40) + ' gpm', 'MOTOR 7,5 cv  380 V  60 Hz']));
   pl.position.set(0.1, 2.3, 0.535); body.add(pl);
   const sg = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.13), safetySign('perigo', ['Risco de', 'esmagamento'])); sg.position.set(-0.32, 0.55, 0.453); body.add(sg);
   const sg2 = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.13), safetySign('obrig', ['Protetor', 'auricular'])); sg2.position.set(-0.4 - 0.036, 1.4, -0.4); sg2.rotation.y = -Math.PI / 2; body.add(sg2);
@@ -141,7 +193,7 @@ function buildPress(def, scheme, s = 1) {
   M(bim, cyl(0.03, 0.03, 0.04), 'red', 0, 1.08, 0.03, { rx: -0.35, edge: false }); M(bim, cyl(0.016, 0.016, 0.03), 'orange', 0.08, 1.05, 0.06, { rx: -0.35, edge: false });
   // poça de óleo / sombra de contato
   const pud = new THREE.Mesh(new THREE.CircleGeometry(0.5, 32), new THREE.MeshStandardMaterial({ color: 0x0a0806, roughness: 0.12, metalness: 0, transparent: true, opacity: 0.55, depthWrite: false }));
-  pud.rotation.x = -Math.PI / 2; pud.scale.set(1.6, 1.2, 1); pud.position.set(0, 0.004, 0.25); pud.renderOrder = 1; pud.userData.noAO = true; body.add(pud);
+  pud.rotation.x = -Math.PI / 2; pud.scale.set(1.6, 1.2, 1); pud.position.set(0, 0.004, 0.25); pud.renderOrder = 1; pud.userData.noAO = true; if (!MODERN) body.add(pud);
   return { root, body, fly, ram, rod, kind: 'press' };
 }
 
@@ -154,12 +206,29 @@ function buildHyd() {
   const ram = new THREE.Group(); body.add(ram); M(ram, rb(1.3, 0.25, 1.0, 0.03), 'hyd', 0, 0, 0); M(ram, cyl(0.16, 0.16, 0.9), 'chrome', 0, 0.55, 0, { edge: false });
   M(body, rb(0.5, 0.6, 0.6), 'hyd', 1.05, 0.3, 0.1); M(body, cyl(0.12, 0.12, 0.35), 'dkgreen', 1.05, 0.75, 0.1, { rz: Math.PI / 2, edge: false });
   for (let i = 0; i < 3; i++) { const c = new THREE.CatmullRomCurve3([new THREE.Vector3(1.0, 0.6, 0.2 - i * 0.1), new THREE.Vector3(1.3, 1.8, 0.1 - i * 0.1), new THREE.Vector3(0.6, 3.3, -0.2 - i * 0.05)]); M(body, new THREE.TubeGeometry(c, 30, 0.016, 8), 'hose', 0, 0, 0, { edge: false }); }
+  if (MODERN) {
+    lightCurtain(body, -0.72, 0.72, 1.0, 2.2, 0.62);
+    for (const sx of [-1, 1]) polyGuard(body, sx * 0.72, 1.0, 2.6, -0.5, 0.5);
+    signalTower(body, 0.55, 3.35, 0.45); hmi(body, 1.15, 1.45, 0.55, -0.6, 1.1);
+  }
   return { root, body, ram, kind: 'hyd' };
 }
 
 // ── painel CNC ──
 function screenCanvas() { const c = document.createElement('canvas'); c.width = 512; c.height = 384; return c; }
 function drawScreen(c, strokes, t) {
+  if (MODERN) { // IHM touch moderna (tema escuro)
+    const x = c.getContext('2d'); x.fillStyle = '#0f151c'; x.fillRect(0, 0, 512, 384); x.fillStyle = '#2364ad'; x.fillRect(0, 0, 512, 40);
+    x.fillStyle = '#fff'; x.font = '600 20px Arial'; x.fillText('LINHA 1 · PRENSA 80 t · AUTO', 14, 27); x.fillStyle = '#22e36a'; x.beginPath(); x.arc(488, 20, 8, 0, 7); x.fill();
+    const tile = (tx, ty, w, h, label, val, col) => { x.fillStyle = '#1a232d'; x.beginPath(); x.roundRect(tx, ty, w, h, 10); x.fill(); x.fillStyle = '#8fa3b5'; x.font = '15px Arial'; x.fillText(label, tx + 12, ty + 24); x.fillStyle = col; x.font = 'bold 32px Arial'; x.fillText(val, tx + 12, ty + 64); };
+    tile(14, 52, 236, 84, 'GOLPES', String(strokes).padStart(6, '0'), '#ffd34a'); tile(262, 52, 236, 84, 'CADÊNCIA', '40 gpm', '#fff');
+    tile(14, 146, 236, 84, 'OEE', (86 + Math.sin(t * 0.2) * 1.5).toFixed(1) + ' %', '#22e36a'); tile(262, 146, 236, 84, 'TEMP. ÓLEO', '41 °C', '#3fa0ff');
+    x.fillStyle = '#1a232d'; x.beginPath(); x.roundRect(14, 240, 484, 74, 10); x.fill();
+    for (let i = 0; i < 12; i++) { const hh = 14 + ((i * 37 + Math.floor(t)) % 7) * 6; x.fillStyle = i === 11 ? '#3fa0ff' : '#2b5f95'; x.fillRect(30 + i * 38, 302 - hh, 26, hh); }
+    x.fillStyle = '#8fa3b5'; x.font = '13px Arial'; x.fillText('Produção por hora', 26, 258);
+    ['INÍCIO', 'RECEITA', 'ALARMES', 'MANUT.'].forEach((s, i) => { x.fillStyle = i ? '#1f2a36' : '#2364ad'; x.beginPath(); x.roundRect(14 + i * 123, 326, 115, 46, 8); x.fill(); x.fillStyle = '#fff'; x.font = '600 16px Arial'; x.fillText(s, 30 + i * 123, 355); });
+    return;
+  }
   const x = c.getContext('2d'), g = x.createLinearGradient(0, 0, 0, 384); g.addColorStop(0, '#0d3a8c'); g.addColorStop(1, '#06205a');
   x.fillStyle = g; x.fillRect(0, 0, 512, 384); x.fillStyle = '#2d6fd6'; x.fillRect(0, 0, 512, 34);
   x.fillStyle = '#fff'; x.font = 'bold 20px monospace'; x.fillText('PROGRAMA O0127   N0040', 10, 24); x.fillText('AUTO', 440, 24);
@@ -225,10 +294,24 @@ function buildGrinder() {
     M(root, cyl(0.12, 0.12, 0.06, 24, 1, true, Math.PI * 0.6, Math.PI * 1.3), 'dkgreen', sx * 0.27, 1.0, 0, { rz: Math.PI / 2, edge: false }); }
   M(root, rb(1.4, 0.06, 0.6), 'dksteel', 0, 0.9, -0.8); for (const x of [-0.6, 0.6]) M(root, rb(0.06, 0.88, 0.5), 'dksteel', x, 0.44, -0.8);
   M(root, rb(0.2, 0.15, 0.15), 'blue', -0.4, 1.0, -0.8);
+  if (MODERN) for (const sx of [-1, 1]) M(root, rb(0.13, 0.09, 0.004, 0.002), 'poly', sx * 0.27, 1.17, 0.1, { rx: -0.6, edge: false, shadow: false });
   return { root, wheels, spark: new THREE.Vector3(0.27, 0.92, 0.1), kind: 'grinder' };
 }
 function buildCompressor() {
   const root = new THREE.Group();
+  if (MODERN) { // compressor de parafuso enclausurado (gabinete acústico)
+    M(root, rb(1.6, 0.08, 1.0, 0.01), 'dksteel', 0, 0.04, 0);
+    M(root, rb(1.5, 1.4, 0.95, 0.04), 'sage', 0, 0.78, 0);
+    M(root, rb(1.52, 0.16, 0.97, 0.03), 'accent', 0, 1.42, 0);
+    for (let i = 0; i < 9; i++) M(root, rb(0.55, 0.02, 0.012, 0.004), 'graphite', -0.38, 0.35 + i * 0.07, 0.478, { shadow: false });
+    M(root, rb(0.22, 0.16, 0.02, 0.01), 'graphite', 0.42, 1.08, 0.478);
+    const sc = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 0.12), new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffffff, emissiveMap: hmiTex(), emissiveIntensity: 0.5 })); sc.position.set(0.42, 1.08, 0.49); root.add(sc);
+    M(root, cyl(0.028, 0.028, 0.02, 20), 'red', 0.42, 0.88, 0.49, { rx: Math.PI / 2, edge: false });
+    const rot = new THREE.Group(); rot.position.set(0.25, 1.51, 0); root.add(rot);
+    for (let i = 0; i < 5; i++) { const b = M(rot, rb(0.24, 0.008, 0.07, 0.003), 'graphite', 0, 0, 0, { ry: (i / 5) * Math.PI * 2, rx: 0.35, edge: false }); b.geometry.translate(0.13, 0, 0); }
+    for (let r = 0.08; r < 0.3; r += 0.07) M(root, new THREE.TorusGeometry(r, 0.004, 4, 32), 'graphite', 0.25, 1.53, 0, { rx: Math.PI / 2, edge: false, shadow: false });
+    return { root, rotor: rot, axis: 'y', kind: 'compressor' };
+  }
   M(root, new THREE.CapsuleGeometry(0.32, 1.2, 8, 24), 'blue', 0, 0.55, 0, { rz: Math.PI / 2, edge: false });
   for (const x of [-0.5, 0.5]) M(root, rb(0.1, 0.25, 0.5), 'dksteel', x, 0.12, 0);
   M(root, rb(0.35, 0.35, 0.3), 'grey', -0.15, 1.05, 0); for (let i = 0; i < 6; i++) M(root, rb(0.4, 0.012, 0.34), 'grey', -0.15, 1.24 + i * 0.03, 0, { shadow: false });
