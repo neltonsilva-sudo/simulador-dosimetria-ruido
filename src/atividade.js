@@ -210,7 +210,7 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
         <div class="ativ-form"><label>Dose diária (%)<input data-in="dose" inputmode="decimal"></label>
           <label>NE (dB(A))<input data-in="ne" inputmode="decimal"></label>
           <label>NEN (dB(A))<input data-in="nen" inputmode="decimal"></label></div>
-        <div class="ativ-resol"><button class="ui-btn" data-a="resol">📐 Resolução</button>${cur.submitted ? '' : '<small>disponível após a entrega</small>'}</div>`;
+        <div class="ativ-resol"><button class="ui-btn" data-a="resol">📐 Resolução</button></div>`;
       else body = `<h3>Parecer técnico (NHO-01)</h3>
         <h4>Classificação</h4><div class="ativ-radio">${CLS_NHO.map((c, i) => `<label><input type="radio" name="cls1" data-in="cls" value="${i}"> ${c}</label>`).join('')}</div>
         <h4>Medidas recomendadas</h4><div class="ativ-check">${MEAS.map(([k, l]) => `<label><input type="checkbox" data-in="meas" value="${k}"> ${l}</label>`).join('')}</div>
@@ -229,7 +229,7 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
     }
     function act(a) {
       const sc = rig.scal;
-      if (a === 'resol') return cur.submitted ? showResol() : warn('A resolução fica disponível após a entrega.');
+      if (a === 'resol') return showResol(); // professor: disponível a qualquer momento
       if (S.firstRegErr && a !== 'foam') return warn('Ação não permitida neste momento.');
       if (a === 'foam') { if (!S.foam && rig.coupled) return warn('Ação não permitida neste momento.'); S.foam = !S.foam; rig.slm.setWindscreen(S.foam); }
       else if (a === 'couple') {
