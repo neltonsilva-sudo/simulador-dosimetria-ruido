@@ -97,3 +97,78 @@
 .ui-vol input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:#fff; border:2px solid #2f8cff; box-shadow:0 1px 4px rgba(0,0,0,.4); }
 .ui-vol input[type=range]::-moz-range-thumb { width:14px; height:14px; border-radius:50%; background:#fff; border:2px solid #2f8cff; }
 @media (max-width:760px){ .ui-vol input[type=range]{ width:80px; } }
+
+/* ── aula "Dose de ruído" (ui_dose.js) ── */
+.dose-on .ui-live, .dose-on .ui-lcd, .dose-on .ui-caption, .dose-on .ui-bar, .dose-on .ui-dash, .dose-on .ui-top { display:none !important; }
+.ui-dose { position:absolute; right:16px; top:16px; width:min(470px, calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; padding:14px 18px 14px; box-sizing:border-box; }
+.ui-dose .dz-h { display:flex; justify-content:space-between; align-items:center; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#9aa4ae; }
+.ui-dose .dz-x { position:static; }
+.ui-dose h3 { margin:6px 0 6px; font-size:18px; line-height:1.25; }
+.ui-dose .dz-p { margin:0 0 10px; font-size:13.5px; line-height:1.5; color:#d7dce1; }
+.ui-dose .dz-calc { background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.08); border-radius:10px; padding:10px 12px; }
+.ui-dose .eq { font:500 15px "Roboto Mono", ui-monospace, Menlo, monospace; display:flex; flex-wrap:wrap; align-items:center; gap:5px; margin:6px 0; color:#eef3f7;
+  border-left:3px solid var(--c, transparent); padding-left:var(--pl, 0); }
+.ui-dose .eq[style*="--c"] { --pl:8px; }
+.ui-dose .eq.big { font-size:18px; justify-content:center; margin:6px 0 10px; }
+.ui-dose .eq small { font-size:11.5px; color:#9aa4ae; }
+.ui-dose .eq b { color:#fff; } .ui-dose .eq b.res { color:#ff8a65; font-size:1.15em; }
+.ui-dose .eq sup, .ui-dose .eq sub { font-size:.68em; }
+.ui-dose .fr { display:inline-flex; flex-direction:column; align-items:center; vertical-align:middle; line-height:1.15; margin:0 1px; }
+.ui-dose .fr > span:first-child { padding:0 4px 2px; border-bottom:1.5px solid currentColor; }
+.ui-dose .fr > span:last-child { padding:2px 4px 0; }
+.ui-dose .par { font-size:1.9em; font-weight:300; line-height:1; color:#b8c2cc; }
+.ui-dose .dz-leg2 { margin:4px 0 8px; padding-left:18px; font-size:12.5px; color:#c3cad1; line-height:1.55; }
+.ui-dose .dz-t { width:100%; border-collapse:collapse; font-size:12.5px; margin:8px 0 4px; }
+.ui-dose .dz-t th { text-align:left; font-weight:600; color:#9aa4ae; font-size:11px; text-transform:uppercase; letter-spacing:.05em; padding:4px 6px; border-bottom:1px solid rgba(255,255,255,.12); }
+.ui-dose .dz-t td { padding:5px 6px; border-bottom:1px solid rgba(255,255,255,.06); }
+.ui-dose .dz-t .dot { display:inline-block; width:10px; height:10px; border-radius:50%; }
+.ui-dose .dz-t td.bad { color:#ff8a80; font-weight:600; }
+.ui-dose .dz-crit tr.on td { background:rgba(229,72,77,.18); color:#ffb3ae; font-weight:600; }
+.ui-dose .dz-note { margin:6px 0 0; font-size:11.5px; color:#9aa4ae; }
+.ui-dose .dz-cards { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:6px; }
+.ui-dose .dz-cards div { border:1px solid rgba(255,255,255,.1); border-left:4px solid var(--c); border-radius:8px; padding:8px 10px; }
+.ui-dose .dz-cards span { display:block; font-size:11px; color:#9aa4ae; text-transform:uppercase; letter-spacing:.05em; }
+.ui-dose .dz-cards b { font-size:19px; font-variant-numeric:tabular-nums; }
+.ui-dose .dz-bar { margin:12px 0 2px; }
+.ui-dose .dz-track { position:relative; height:16px; border-radius:8px; background:rgba(255,255,255,.08); overflow:hidden; }
+.ui-dose .dz-track i { position:absolute; top:0; bottom:0; left:0; }
+.ui-dose .dz-track em { position:absolute; top:-2px; bottom:-2px; width:2px; background:rgba(255,255,255,.75); }
+.ui-dose .dz-track em.lim { background:#ff5252; width:3px; }
+.ui-dose .dz-scale { position:relative; height:16px; font-size:10.5px; color:#9aa4ae; }
+.ui-dose .dz-scale span { position:absolute; top:3px; transform:translateX(-50%); white-space:nowrap; }
+.ui-dose .dz-scale span:first-child { transform:none; }
+.ui-dose .dz-leg { display:flex; gap:14px; font-size:12px; color:#c3cad1; margin-top:4px; }
+.ui-dose .dz-leg i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+.ui-dose .dz-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.ui-dose .dz-chips span { font-size:12px; padding:4px 9px; border-radius:20px; background:rgba(255,255,255,.08); }
+.ui-dose .dz-chips span.bad { background:rgba(229,72,77,.25); color:#ffc0bb; font-weight:700; }
+.ui-dose .dz-verd { text-align:center; font-weight:800; letter-spacing:.06em; color:#fff; background:linear-gradient(180deg,#e5484d,#b72a30); border-radius:8px; padding:8px; font-size:14px; }
+.ui-dose .dz-med { margin:8px 0 0; padding-left:20px; font-size:12.5px; line-height:1.5; color:#d7dce1; }
+.ui-dose .dz-dots { display:flex; gap:6px; justify-content:center; margin:12px 0 8px; }
+.ui-dose .dz-dots button { width:9px; height:9px; padding:0; border-radius:50%; border:0; background:rgba(255,255,255,.2); cursor:pointer; }
+.ui-dose .dz-dots button.done { background:rgba(90,164,255,.55); } .ui-dose .dz-dots button.on { background:#5aa4ff; transform:scale(1.35); }
+.ui-dose .dz-nav { display:flex; gap:6px; justify-content:space-between; flex-wrap:wrap; }
+.ui-dose .dz-nav .ui-btn { padding:8px 11px; font-size:12.5px; }
+.ui-dose-lbl { position:absolute; left:0; top:0; display:flex; align-items:center; gap:8px; padding:7px 11px 7px 8px; border-radius:10px; pointer-events:none;
+  background:rgba(12,14,17,.82); border:1px solid rgba(255,255,255,.16); backdrop-filter:blur(8px); box-shadow:0 6px 24px rgba(0,0,0,.4); transition:opacity .3s; white-space:nowrap; }
+.ui-dose-lbl > i { width:5px; align-self:stretch; border-radius:3px; }
+.ui-dose-lbl b { display:block; font-size:11px; letter-spacing:.1em; color:#fff; }
+.ui-dose-lbl span { display:block; font-size:11.5px; color:#aab3bd; }
+.ui-dose-lbl em { display:block; font-style:normal; font-weight:800; font-size:17px; color:#fff; font-variant-numeric:tabular-nums; }
+.ui-dose-lbl .w { text-decoration:none; font-weight:900; font-size:20px; letter-spacing:-2px; animation:dzw 1s infinite; }
+.ui-dose-lbl::after { content:""; position:absolute; left:50%; bottom:-7px; width:12px; height:12px; background:rgba(12,14,17,.82); border-right:1px solid rgba(255,255,255,.16); border-bottom:1px solid rgba(255,255,255,.16); transform:translateX(-50%) rotate(45deg); }
+@keyframes dzw { 0%,100% { opacity:.35 } 50% { opacity:1 } }
+.ui-dose-lbl.hidden, .ui-dose.hidden { display:none; }
+@media (max-width: 760px) {
+  .ui-dose { left:8px; right:8px; top:auto; bottom:8px; width:auto; max-height:56vh; padding:12px 14px; }
+  .ui-dose h3 { font-size:16px; } .ui-dose .eq { font-size:13px; } .ui-dose .eq.big { font-size:15px; }
+  .ui-dose-lbl { transform-origin:center bottom; } .ui-dose-lbl em { font-size:14px; }
+}
+.ui-dose .dz-cards3 { grid-template-columns:1fr 1fr 1fr; }
+.ui-dose .dz-cards3 b { font-size:14.5px; } .ui-dose .dz-cards small { display:block; font-size:11px; color:#9aa4ae; margin-top:2px; }
+.ui-dose .dz-live { margin:10px 0 6px; padding:8px 12px; border-radius:8px; background:#aeb9a5; color:#15181a; font-size:13px; font-weight:600; }
+.ui-dose .dz-live b { font:700 22px "Roboto Mono", ui-monospace, monospace; margin:0 4px; } .ui-dose .dz-live small { color:#3b4238; }
+.ui-dose .dz-pass { margin:8px 0 4px; padding-left:22px; font-size:12px; color:#9aa4ae; }
+.ui-dose .dz-pass li { margin:4px 0; } .ui-dose .dz-pass li > span { display:block; text-transform:uppercase; letter-spacing:.05em; font-size:10.5px; }
+.ui-dose .dz-pass .eq { margin:2px 0; font-size:14px; }
+@media (max-width: 760px) { .ui-dose .dz-cards3 { grid-template-columns:1fr 1fr; } }

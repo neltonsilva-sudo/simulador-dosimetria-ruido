@@ -1,6 +1,7 @@
 // Interface + demonstração narrada — dono: UI/DEMO.
 // Fluxo: explorar → Dosímetro (apresentação: operar + calibrar) → colocar na trabalhadora → iniciar dosimetria → parar + pós-cal → relatório.
 import { STEPS, CHAPTERS, MOUNT_TEXT, fwDo } from './demo.js';
+import { createDoseLesson } from './ui_dose.js';
 
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 const f1 = (v) => (isFinite(v) ? v.toFixed(1) : '—');
@@ -79,7 +80,7 @@ export function createUI(root, app) {
     return new Promise((res) => {
       stopVoice();
       const clean = text.replace(/<[^>]+>/g, '');
-      const spoken = clean.replace(/\bNHO[- ]?0?1\b/g, 'ene agá ó zero um').replace(/\bNHO\b/g, 'ene agá ó'); // sigla soletrada na voz do navegador
+      const spoken = clean.replace(/\bNHO[- ]?0?1\b/g, 'ene agá ó zero um').replace(/\bNHO\b/g, 'ene agá ó').replace(/dB\(A\)/g, 'decibéis A').replace(/\bNEN\b/g, 'ene é ene').replace(/\bNE\b/g, 'ene é').replace(/\bNR-15\b/g, 'ene erre quinze'); // sigla soletrada na voz do navegador
       let done = false; const fin = () => { if (!done) { done = true; res(); } };
       const synth = () => {
         if (!voiceOn || !window.speechSynthesis) return setTimeout(fin, Math.min(9000, 1200 + clean.length * 45));
@@ -98,6 +99,8 @@ export function createUI(root, app) {
     });
   }
 
+  const dose = createDoseLesson({ root, app, h, say: (t) => say(t), stopVoice: () => stopVoice() });
+  const doseBtn = (cls = 'big') => btn('📐 Dose', cls, () => dose.open(0));
   function btn(label, cls, fn) { const b = h('button', 'ui-btn ' + (cls || ''), label); b.onclick = fn; return b; }
   function setBar(items) { bar.innerHTML = ''; items.forEach((i) => i && bar.appendChild(i)); }
   // som: botão liga/desliga + barra de volume (máquinas, bipes, calibrador e narração)
@@ -123,7 +126,7 @@ export function createUI(root, app) {
     dash.classList.toggle('hidden', !['dosimetria', 'relatorio'].includes(p));
     if (p === 'explorar') {
       cap.classList.add('hidden');
-      setBar([soundBtn(), viewBtns(), btn('🎓 Demonstração', 'big', openDemoChooser), btn('<span class="ic">◉</span> Dosímetro', 'primary big', () => startPresentation('tudo'))]);
+      setBar([soundBtn(), viewBtns(), btn('🎓 Demonstração', 'big', openDemoChooser), doseBtn(), btn('<span class="ic">◉</span> Dosímetro', 'primary big', () => startPresentation('tudo'))]);
     } else if (p === 'apresentacao') {
       setBar([soundBtn(), btn('◀ Anterior', '', () => goStep(stepIdx - 1)), btn(`Próximo ▶`, 'primary', () => goStep(stepIdx + 1)),
         btn(voiceOn ? '🗣 Voz' : '🔈 Voz off', 'ghost', () => { voiceOn = !voiceOn; if (!voiceOn) stopVoice(); render(); }),
@@ -138,7 +141,7 @@ export function createUI(root, app) {
       const sp = h('div', 'ui-seg'); for (const s of [60, 240, 960]) { const b = btn(s + '×', 'seg' + (S.speed === s ? ' on' : ''), () => { app.setSpeed(s); render(); }); sp.appendChild(b); }
       setBar([soundBtn(), viewBtns(), h('span', 'ui-lbl', 'Velocidade'), sp, btn(S.running ? '❙❙ Pausar simulação' : '▶ Continuar', 'ghost', () => { S.running ? app.pauseDosimetry() : (S.running = true); render(); }), btn('■ Encerrar e pós-calibrar', 'danger', stopAndReport)]);
     } else if (p === 'relatorio') {
-      setBar([soundBtn(), btn('🎓 Demonstração', 'ghost', openDemoChooser), btn('📄 Ver relatório', 'primary', showReport), btn('↺ Nova avaliação', 'ghost', () => location.reload())]);
+      setBar([soundBtn(), btn('🎓 Demonstração', 'ghost', openDemoChooser), doseBtn('ghost'), btn('📄 Ver relatório', 'primary', showReport), btn('↺ Nova avaliação', 'ghost', () => location.reload())]);
     }
   }
   function showCaption(title, text, count) {
