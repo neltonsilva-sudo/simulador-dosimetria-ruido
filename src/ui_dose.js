@@ -327,13 +327,13 @@ export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = ()
       <h3>${st.title}</h3><p class="dz-p">${st.text}</p><div class="dz-calc">${st.html()}</div>
       <div class="dz-dots">${DOSE_STEPS.map((s, i) => `<button data-i="${i}" class="${i === idx ? 'on' : i < idx ? 'done' : ''}" title="${s.title}"></button>`).join('')}</div>
       <div class="dz-nav"><button class="ui-btn" data-a="prev">◀ Anterior</button><button class="ui-btn ghost" data-a="auto">${auto ? '⏸ Pausar' : '▶ Continuar'}</button>
-        <button class="ui-btn ghost" data-a="rep">🔁 Ouvir</button><button class="ui-btn primary" data-a="next">${idx === DOSE_STEPS.length - 1 ? 'Concluir ✓' : 'Próximo ▶'}</button></div>`;
+        <button class="ui-btn ghost" data-a="rep">🔁 Ouvir</button><button class="ui-btn ghost" data-a="quiet">${app.audio?.quiet ? '🔉 Ruído baixo' : '🔊 Ruído normal'}</button><button class="ui-btn primary" data-a="next">${idx === DOSE_STEPS.length - 1 ? 'Concluir ✓' : 'Próximo ▶'}</button></div>`;
     panel.querySelector('.dz-x').onclick = close;
     panel.querySelectorAll('.dz-dots button').forEach((b) => (b.onclick = () => go(+b.dataset.i)));
     panel.querySelectorAll('.dz-nav button').forEach((b) => (b.onclick = () => {
       const a = b.dataset.a;
       if (a === 'prev') go(idx - 1); else if (a === 'next') (idx === DOSE_STEPS.length - 1 ? close() : go(idx + 1));
-      else if (a === 'rep') go(idx); else if (a === 'auto') { auto = !auto; held = !auto; if (auto) resume(); else pauseVoice(); paint(); }
+      else if (a === 'rep') go(idx); else if (a === 'quiet') { app.audio?.setQuiet?.(!app.audio.quiet); paint(); } else if (a === 'auto') { auto = !auto; held = !auto; if (auto) resume(); else pauseVoice(); paint(); }
     }));
     applyMarks(); panel.scrollTop = 0;
   }
@@ -369,6 +369,7 @@ export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = ()
     if (my === token && active && auto) go(idx + 1);
   }
   function open(start = 0) {
+    if (!active) app.audio?.explaining?.(true);
     if (active) return go(start);
     app.audio?.start?.(); active = true; prevView = app.stage.view || 'ref';
     host.classList.add('dose-on'); panel.classList.remove('hidden'); group.visible = true;
@@ -376,7 +377,7 @@ export function createDoseLesson({ root, app, h, say, stopVoice, pauseVoice = ()
     go(start);
   }
   function close() {
-    if (!active) return; active = false; token++; stopVoice(); cues = []; resetRig(); slmPanel.classList.add('hidden');
+    if (!active) return; active = false; token++; stopVoice(); app.audio?.explaining?.(false); cues = []; resetRig(); slmPanel.classList.add('hidden');
     host.classList.remove('dose-on'); panel.classList.add('hidden'); group.visible = false; slm.group.visible = false; slmAt = null;
     for (const m of marks) m.lbl.classList.add('hidden');
     app.audio?.setRunning?.(app.running());

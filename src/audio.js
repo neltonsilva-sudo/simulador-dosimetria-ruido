@@ -5,7 +5,11 @@ import { MACHINES } from './layout_machines.js';
 const GOLPE = typeof location !== 'undefined' && new URLSearchParams(location.search).get('golpe') === '1';
 
 export function createAudio(stage, app) {
-  let ctx = null, master = null, muffle = null, started = false, muted = false, bus = null, ducked = false, bed = 1; // bed: nível do galpão (atividade = mais baixo)
+  let ctx = null, master = null, muffle = null, started = false, muted = false, bus = null, ducked = false, bed = 1, explain = 0, quiet = true; // bed: nível do galpão (atividade = mais baixo); quiet: ruído baixo durante explicações
+  try { quiet = localStorage.getItem('dosi.quiet') !== '0'; } catch {}
+  const QUIET = 0.3; // ≈ −10 dB no modo 'ruído baixo'
+  const level = () => bed * (explain > 0 && quiet ? QUIET : 1) * (ducked ? DUCK : 1);
+  const apply = (tc) => { if (bus) bus.gain.setTargetAtTime(level(), ctx.currentTime, tc); };
   const DUCK = 0.5; // durante a narração as máquinas/ambiente caem ≈ 6 dB (a voz é um <audio> fora deste grafo)
   let vol = 0.7; try { const v = parseFloat(localStorage.getItem('dosi.vol')); if (v >= 0 && v <= 1) vol = v; } catch {}
   const gainFor = () => (muted ? 0 : 0.8 * vol * vol * 1.4); // curva perceptual (≈ 0,55 em 70 %)
@@ -30,7 +34,7 @@ export function createAudio(stage, app) {
     muffle = ctx.createBiquadFilter(); muffle.type = 'lowpass'; muffle.frequency.value = 18000;
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
     master.connect(muffle).connect(comp).connect(ctx.destination);
-    bus = ctx.createGain(); bus.gain.value = bed * (ducked ? DUCK : 1); bus.connect(master); // barramento do ruído do galpão
+    bus = ctx.createGain(); bus.gain.value = level(); bus.connect(master); // barramento do ruído do galpão
     const white = noiseBuffer(2, 'white'), brown = noiseBuffer(3, 'brown');
     // ambiente reverberante do galpão (ruído marrom baixo)
     const amb = loop(brown), ag = ctx.createGain(); ag.gain.value = 0.10; const alp = ctx.createBiquadFilter(); alp.type = 'lowpass'; alp.frequency.value = 400;
@@ -90,9 +94,13 @@ export function createAudio(stage, app) {
     get muted() { return muted; },
     setRunning,
     /** abaixa um pouco o ruído do galpão enquanto a narração fala */
-    duck(b) { ducked = !!b; if (bus) bus.gain.setTargetAtTime(bed * (ducked ? DUCK : 1), ctx.currentTime, ducked ? 0.12 : 0.5); },
+    duck(b) { ducked = !!b; apply(ducked ? 0.12 : 0.5); },
     /** nível de fundo do galpão (1 = normal); a atividade prática usa mais baixo */
-    setBed(v) { bed = Math.max(0, Math.min(1, +v)); if (bus) bus.gain.setTargetAtTime(bed * (ducked ? DUCK : 1), ctx.currentTime, 0.4); },
+    setBed(v) { bed = Math.max(0, Math.min(1, +v)); apply(0.4); },
+    /** explicação em andamento (demonstração, aula da Dose, atividade): contador de contextos abertos */
+    explaining(b) { explain = Math.max(0, explain + (b ? 1 : -1)); apply(0.4); },
+    /** opção 'ruído baixo' durante explicações (salva no navegador) */
+    get quiet() { return quiet; }, setQuiet(b) { quiet = !!b; try { localStorage.setItem('dosi.quiet', quiet ? '1' : '0'); } catch {} apply(0.3); },
     setEarplugs(b) { if (muffle) muffle.frequency.setTargetAtTime(b ? 900 : 18000, ctx.currentTime, 0.1); },
     tone(on, level = 114) {
       if (!ctx) return;

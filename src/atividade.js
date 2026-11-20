@@ -146,7 +146,7 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
     panel.innerHTML = `<div class="dz-h"><span>📝 ${title} · ${esc(aluno)}${guiado ? ' · com orientação' : ''}</span><button class="ui-x dz-x" title="Sair da atividade">✕</button></div>
       ${caseHtml || ''}
       <div class="ativ-tabs">${tabs.map((t, i) => `<button data-t="${i}" class="${i === tab ? 'on' : ''}${cur.done?.[i] ? ' ok' : ''}">${i + 1}. ${t}</button>`).join('')}</div>
-      <div class="ativ-voz"><button class="ui-btn ghost" data-v="ouvir">🔊 Ouvir</button><button class="ui-btn ghost" data-v="mudo">${voz ? '🔇 Silenciar' : '🔈 Ativar voz'}</button></div>
+      <div class="ativ-voz"><button class="ui-btn ghost" data-v="ouvir">🔊 Ouvir</button>${guiado ? `<button class="ui-btn ghost" data-v="quiet">${app.audio?.quiet ? '🔉 Ruído baixo' : '🔊 Ruído normal'}</button>` : ''}<button class="ui-btn ghost" data-v="mudo">${voz ? '🔇 Silenciar' : '🔈 Ativar voz'}</button></div>
       ${guiado ? `<div class="ativ-guia">💡 ${(cur.kind === 1 ? ORIENT.a1 : ORIENT.a2)[tab]?.text || ''}</div>` : ''}
       <div class="ativ-body">${body}</div>
       <div class="dz-nav"><button class="ui-btn" data-n="prev">◀ Etapa anterior</button><button class="ui-btn" data-n="next">Próxima etapa ▶</button><button class="ui-btn primary" data-n="send">Entregar ✓</button></div>`;
@@ -155,13 +155,15 @@ export function createActivities({ root, app, h, say, stopVoice, dose, fwDo }) {
     panel.querySelector('[data-n="prev"]').onclick = () => cur.goTab(Math.max(0, cur.tab - 1));
     panel.querySelector('[data-n="next"]').onclick = () => cur.goTab(Math.min(tabs.length - 1, cur.tab + 1));
     panel.querySelector('[data-v="ouvir"]').onclick = () => { if (!voz) { voz = true; try { localStorage.setItem('ativ.voz', '1'); } catch {} cur.rerender?.(); } orient(); };
+    const qb = panel.querySelector('[data-v="quiet"]'); if (qb) qb.onclick = () => { app.audio?.setQuiet?.(!app.audio.quiet); cur.rerender?.(); };
     panel.querySelector('[data-v="mudo"]').onclick = () => { voz = !voz; try { localStorage.setItem('ativ.voz', voz ? '1' : '0'); } catch {} if (!voz) stopVoice?.(); else orient(); cur.rerender?.(); };
     panel.querySelector('[data-n="send"]').onclick = () => { if (confirm('Entregar a atividade e ver a nota?')) cur.submit(); };
     panel.classList.remove('hidden');
   }
-  function enter(cls) { stopVoice?.(); host.classList.add('ativ-on', cls); modal.classList.add('hidden'); app.audio?.setBed?.(0.35); } // ruído do galpão mais baixo durante a atividade
+  let ativExpl = false;
+  function enter(cls) { stopVoice?.(); host.classList.add('ativ-on', cls); modal.classList.add('hidden'); app.audio?.setBed?.(0.35); if (guiado) { ativExpl = true; app.audio?.explaining?.(true); } } // ruído do galpão mais baixo durante a atividade
   function exit() {
-    if (!cur) return; cur.cleanup?.(); cur = null; sayTok++; stopVoice?.(); app.audio?.setBed?.(1);
+    if (!cur) return; cur.cleanup?.(); cur = null; sayTok++; stopVoice?.(); app.audio?.setBed?.(1); if (ativExpl) { ativExpl = false; app.audio?.explaining?.(false); }
     host.classList.remove('ativ-on', 'ativ1', 'ativ2'); panel.classList.add('hidden'); panel.innerHTML = '';
     app.setView('ref', { animate: true, duration: 1.6 });
   }

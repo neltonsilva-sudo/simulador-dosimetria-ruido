@@ -165,6 +165,7 @@ export function createUI(root, app) {
     } else if (p === 'apresentacao') {
       setBar([soundBtn(), btn('◀ Anterior', '', () => goStep(stepIdx - 1)), btn(`Próximo ▶`, 'primary', () => goStep(stepIdx + 1)),
         btn(demoClock.paused ? '▶ Continuar' : '❙❙ Pausar', 'ghost' + (demoClock.paused ? ' on' : ''), toggleDemoPause),
+        btn(app.audio?.quiet ? '🔉 Ruído baixo' : '🔊 Ruído normal', 'ghost', () => { app.audio?.setQuiet?.(!app.audio.quiet); render(); }),
         btn(voiceOn ? '🗣 Voz' : '🔈 Voz off', 'ghost', () => { voiceOn = !voiceOn; if (!voiceOn) stopVoice(); render(); }),
         btn('Pular demonstração ⏭', 'ghost', () => finishPresentation())]);
     } else if (p === 'pronto') {
@@ -186,7 +187,9 @@ export function createUI(root, app) {
   }
 
   let steps = STEPS, chapterId = 'tudo';
+  let demoExpl = false;
   async function startPresentation(ch = 'tudo') {
+    if (!demoExpl) { demoExpl = true; app.audio?.explaining?.(true); } // ruído baixo durante a explicação (opção)
     app.audio?.start?.(); modal.classList.add('hidden');
     chapterId = typeof ch === 'string' ? ch : 'tudo';
     steps = chapterId === 'tudo' ? STEPS : STEPS.filter((x) => x.chapter === chapterId);
@@ -230,6 +233,7 @@ export function createUI(root, app) {
     if (my === token && st.auto !== false && S.phase === 'apresentacao') { await pwait(900); if (my === token) goStep(i + 1); }
   }
   async function finishPresentation() {
+    if (demoExpl) { demoExpl = false; app.audio?.explaining?.(false); }
     token++; stopVoice(); demoClock.paused = false;
     app.dosimeter?.highlight?.(null);
     await fwDo.ensureReady(app); // ligado + calibrado + espuma no lugar, calibrador guardado
