@@ -2,6 +2,7 @@
 // Fluxo: explorar → Dosímetro (apresentação: operar + calibrar) → colocar na trabalhadora → iniciar dosimetria → parar + pós-cal → relatório.
 import { STEPS, CHAPTERS, MOUNT_TEXT, CAPTIONS, fwDo, demoClock } from './demo.js';
 import { createActivities } from './atividade.js';
+import { createReport } from './report.js';
 import { createDoseLesson } from './ui_dose.js';
 
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -265,7 +266,9 @@ export function createUI(root, app) {
   app.on('workdayEnd', () => { if (S.phase === 'dosimetria') stopAndReport(); });
 
   // ── relatório ──
-  function showReport() {
+  const report = createReport({ root, app, h });
+  function showReport() { report.open(); }
+  function showReportOld() {
     const r = app.results(); if (!r) return;
     const D = app.DOSI, uc = userCrit(r), rows = ['NHO01', 'NR15', 'USER'].map((k) => {
       const s = r[k]; if (!s) return ''; const C = k === 'USER' ? { ...D.CRITERIA.USER, ...uc } : D.CRITERIA[k]; const v = D.verdict(s, C);

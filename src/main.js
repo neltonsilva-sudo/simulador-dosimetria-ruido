@@ -105,6 +105,29 @@ function flyObjectTo(obj, anchor, duration) {
 
 // ─── simulação da jornada (tempo acelerado, passos de 1 s simulado) ───
 let lastSimLevel = null, simAcc = 0;
+// ─── registro da medição para o relatório (série de 1 min, histograma, Lmin, pico, oitavas) ───
+const LOG = { run: null };
+app.log = LOG;
+function logReset(run) {
+  Object.assign(LOG, { run, series: [], bE: 0, bN: 0, bT0: state.clock, lmin: Infinity, peak: -Infinity, p115: 0, above: false,
+    specE: new Array(DOSI.OCTAVES.length).fill(0), specN: 0, spec: null, lastSpecT: -1e9 });
+}
+let logRnd = 0x9e3779b9;
+function logSample(L, mic) {
+  const fs = app.fw?.state; if (!fs || fs.mode !== 'run' || L == null) return;
+  if (LOG.run !== fs.run) logReset(fs.run);
+  LOG.bE += Math.pow(10, L / 10); LOG.bN++;
+  if (L < LOG.lmin) LOG.lmin = L;
+  logRnd = (logRnd * 1664525 + 1013904223) >>> 0; const crest = 7 + (logRnd / 4294967296) * 6; // fator de crista das prensas (impactos)
+  if (L + crest > LOG.peak) LOG.peak = L + crest;
+  const hi = L + crest >= 115; if (hi && !LOG.above) LOG.p115++; LOG.above = hi;
+  if (state.clock - LOG.bT0 >= 60) { LOG.series.push({ t: state.clock, L: 10 * Math.log10(LOG.bE / LOG.bN) }); LOG.bE = 0; LOG.bN = 0; LOG.bT0 = state.clock; }
+  if (state.clock - LOG.lastSpecT >= 300) { // espectro em oitavas (Z) no microfone, ajustado ao nível A do momento
+    LOG.lastSpecT = state.clock; const z = spectrumAt(mic, app.running()); const a = DOSI.weighted(z, 'A');
+    z.forEach((v, i) => { if (isFinite(v)) LOG.specE[i] += Math.pow(10, (v + L - a) / 10); }); LOG.specN++;
+    LOG.spec = LOG.specE.map((e) => (e > 0 ? 10 * Math.log10(e / LOG.specN) : -Infinity));
+  }
+}
 const tmpMic = new THREE.Vector3();
 function stepSimulation(dt) {
   const fw = app.fw;
@@ -117,6 +140,7 @@ function stepSimulation(dt) {
     const L = WD.levelOnSchedule(app.workday, state.clock, field);
     fw?.setClock?.(state.clock);
     if (L != null) { lastSimLevel = L; fw?.feed?.(L, 1, state.clock); } else fw?.feed?.(null, 1, state.clock);
+    logSample(L, tmpMic);
     if ((state.clock | 0) % 30 === 0) { const act = WD.activityAt(app.workday, state.clock)?.id; // movimento da trabalhadora segue a jornada
       app.worker?.setActivity?.(act === 'operando' || act === 'setup' ? 'operando' : 'parada'); }
     if (state.clock >= app.workday.end) { state.running = false; app.emit('workdayEnd'); app.emit('change'); break; }
